@@ -321,6 +321,8 @@ Se terminar o bloco ${newBlock}, faça a transição naturalmente.`;
                 src="/images/alfred-head.png" 
                 alt="Alfred" 
                 fill
+                priority
+                sizes="(max-width: 768px) 64px, 128px"
                 className="object-contain p-1.5"
               />
             </div>
