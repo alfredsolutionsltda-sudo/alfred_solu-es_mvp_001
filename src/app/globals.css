@@ -1,0 +1,92 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply bg-background text-on-surface font-body;
+  }
+}
+
+@layer utilities {
+  .hatch-pattern {
+    background-image: repeating-linear-gradient(
+      135deg,
+      transparent,
+      transparent 8px,
+      rgba(20, 85, 206, 0.08) 8px,
+      rgba(20, 85, 206, 0.08) 10px
+    );
+  }
+
+  .hatch-pattern-green {
+    background-image: repeating-linear-gradient(
+      135deg,
+      transparent,
+      transparent 8px,
+      rgba(45, 164, 78, 0.08) 8px,
+      rgba(45, 164, 78, 0.08) 10px
+    );
+  }
+
+  .smooth-gradient {
+    background: linear-gradient(135deg, #fb923c 0%, #f43f5e 50%, #fcd34d 100%);
+  }
+
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .pt-safe {
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+.overflow-hidden-mobile {
+  overflow: hidden !important;
+  position: fixed;
+  width: 100%;
+}
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #c3c6d6; border-radius: 9999px; }
+::-webkit-scrollbar-thumb:hover { background: #737685; }
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  .print-only {
+    display: block !important;
+  }
+  body {
+    background: white !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  .print-content {
+    width: 100% !important;
+    max-width: none !important;
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+  }
+}
