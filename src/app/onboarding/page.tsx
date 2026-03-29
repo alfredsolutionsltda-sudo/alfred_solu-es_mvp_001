@@ -368,7 +368,7 @@ Se terminar o bloco ${newBlock}, faça a transição naturalmente.`;
                 </div>
               </div>
               <span className="text-[8px] md:text-[9px] font-black text-neutral-300 uppercase tracking-widest mt-1.5 md:mt-2 mx-10 md:mx-11 leading-none">
-                  {msg.role === 'assistant' ? 'Alfred OS' : 'Você'}
+                  {msg.role === 'assistant' ? 'Alfred' : 'Você'}
               </span>
             </div>
           ))}

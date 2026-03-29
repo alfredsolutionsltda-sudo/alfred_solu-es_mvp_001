@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { LogIn, Mail, Lock, Loader2, ShieldCheck } from 'lucide-react'
+import Image from 'next/image'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -36,11 +37,16 @@ export default function LoginPage() {
       <div className="w-full max-w-[420px] animate-[fadeIn_0.5s_ease-out] py-8">
         {/* Logo */}
         <div className="flex flex-col items-center justify-center mb-8 md:mb-10 group">
-          <div className="w-12 h-12 md:w-16 md:h-16 rounded-[18px] md:rounded-[22px] flex items-center justify-center bg-[#1455CE] shadow-2xl shadow-[#1455CE]/30 group-hover:scale-110 transition-transform duration-500 ease-out">
-            <span className="text-white text-2xl md:text-3xl font-black tracking-tighter">A</span>
+          <div className="relative w-16 h-16 md:w-20 md:h-20 rounded-[22px] md:rounded-[28px] overflow-hidden bg-white shadow-2xl shadow-[#1455CE]/20 group-hover:scale-110 transition-transform duration-500 ease-out border-2 border-white">
+            <Image 
+              src="/images/alfred-head.png" 
+              alt="Alfred" 
+              fill
+              className="object-contain p-1.5"
+            />
           </div>
           <h1 className="mt-4 text-xl md:text-2xl font-headline font-black text-neutral-900 tracking-tighter">
-            Alfred <span className="text-[#1455CE]">OS</span>
+            Alfred
           </h1>
         </div>
 

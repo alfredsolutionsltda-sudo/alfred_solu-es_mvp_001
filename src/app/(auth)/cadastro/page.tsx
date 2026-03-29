@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { MailCheck } from 'lucide-react'
+import Image from 'next/image'
 
 export default function CadastroPage() {
   const router = useRouter()
@@ -64,11 +65,18 @@ export default function CadastroPage() {
     <main className="min-h-screen flex items-center justify-center bg-[#F9F9F7] px-4 font-body py-8">
       <div className="w-full max-w-[420px]">
         {/* Logo */}
-        <div className="flex items-center justify-center gap-3 mb-8 md:mb-10 group">
-          <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl flex items-center justify-center bg-[#1455CE] shadow-sm group-hover:scale-110 transition-transform duration-300">
-            <span className="text-white text-lg md:text-xl font-bold">A</span>
+        <div className="flex flex-col items-center justify-center mb-8 md:mb-10 group">
+          <div className="relative w-16 h-16 md:w-20 md:h-20 rounded-[22px] md:rounded-[28px] overflow-hidden bg-white shadow-2xl shadow-[#1455CE]/20 group-hover:scale-110 transition-transform duration-500 ease-out border-2 border-white">
+            <Image 
+              src="/images/alfred-head.png" 
+              alt="Alfred" 
+              fill
+              className="object-contain p-1.5"
+            />
           </div>
-          <span className="text-xl md:text-2xl font-black text-neutral-900 tracking-tight">Alfred</span>
+          <h1 className="mt-4 text-xl md:text-2xl font-headline font-black text-neutral-900 tracking-tighter">
+            Alfred
+          </h1>
         </div>
 
         {/* Card */}
