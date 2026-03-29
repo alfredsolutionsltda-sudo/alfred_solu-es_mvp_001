@@ -8,6 +8,7 @@ import NewClientModal from "./NewClientModal";
 import ImportCSVModal from "./ImportCSVModal";
 import NewContractModal from "../contracts/NewContractModal";
 import { ClientWithMetrics } from "@/types/clients";
+import ScoreUpdater from "./ScoreUpdater";
 
 export default function ClientsClient({ initialClients, userId }: { initialClients: ClientWithMetrics[], userId: string }) {
   const [selectedClient, setSelectedClient] = useState<ClientWithMetrics | null>(null);
@@ -17,6 +18,7 @@ export default function ClientsClient({ initialClients, userId }: { initialClien
 
   return (
     <>
+      <ScoreUpdater />
       <div className="space-y-6">
         <ClientFilters 
           onNewClient={() => setIsNewModalOpen(true)} 

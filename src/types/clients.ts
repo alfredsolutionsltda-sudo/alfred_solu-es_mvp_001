@@ -11,6 +11,11 @@ export interface Client {
   status: ClientStatus;
   status_manual: ClientStatus | null;
   inadimplency_score: number;
+  company_name: string | null;
+  cnpj: string | null;
+  industry: string | null;
+  website: string | null;
+  alfred_context: string | null;
   notes: string | null;
   created_at: string;
   updated_at: string;

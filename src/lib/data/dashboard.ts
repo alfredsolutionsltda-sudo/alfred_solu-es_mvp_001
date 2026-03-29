@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { Contract, Faturamento, Client } from '@/types/database'
+import { Contract, Faturamento } from '@/types/database'
 
 export type DashboardPeriod = 'mes' | 'trimestre' | 'ano'
 
@@ -49,24 +49,20 @@ export async function getDashboardMetrics(userId: string, period: DashboardPerio
     .lte('end_date', in30Days.toISOString().split('T')[0])
 
   // Faturamento e Inadimplencia (filtered by period)
-  const { data: faturamentoData } = await supabase
-    .from('faturamento')
-    .select('amount, status, created_at')
-    .eq('user_id', userId)
-    .gte('created_at', startDate)
-    .lte('created_at', endDate)
+  // Otimizado: Busca apenas somas parciais para evitar carregar milhares de linhas
+  const [
+    { data: pagoData },
+    { data: atrasadoData },
+    { data: pendenteData }
+  ] = await Promise.all([
+    supabase.from('faturamento').select('amount').eq('user_id', userId).eq('status', 'pago').gte('created_at', startDate).lte('created_at', endDate),
+    supabase.from('faturamento').select('amount').eq('user_id', userId).eq('status', 'atrasado').gte('created_at', startDate).lte('created_at', endDate),
+    supabase.from('faturamento').select('amount').eq('user_id', userId).eq('status', 'pendente').gte('created_at', startDate).lte('created_at', endDate)
+  ]);
 
-  const faturamentoPeriodo = faturamentoData
-    ?.filter(f => f.status === 'pago')
-    .reduce((sum, f) => sum + Number(f.amount), 0) || 0
-
-  const inadimplenciaTotal = faturamentoData
-    ?.filter(f => f.status === 'atrasado')
-    .reduce((sum, f) => sum + Number(f.amount), 0) || 0
-
-  const totalPendente = faturamentoData
-    ?.filter(f => f.status === 'pendente')
-    .reduce((sum, f) => sum + Number(f.amount), 0) || 0
+  const faturamentoPeriodo = pagoData?.reduce((sum: number, f: any) => sum + Number(f.amount), 0) || 0;
+  const inadimplenciaTotal = atrasadoData?.reduce((sum: number, f: any) => sum + Number(f.amount), 0) || 0;
+  const totalPendente = pendenteData?.reduce((sum: number, f: any) => sum + Number(f.amount), 0) || 0;
 
   // Clientes ativos
   const { count: clientesAtivos } = await supabase
@@ -134,12 +130,12 @@ export async function getFaturamentoWidget(userId: string, period: DashboardPeri
 
   const safeFat = (faturamento || []) as Faturamento[]
 
-  const total = safeFat.reduce((sum, f) => sum + Number(f.amount), 0)
+  const total = safeFat.reduce((sum: number, f: Faturamento) => sum + Number(f.amount), 0)
   
   const breakdown = {
-    honorario_fixo: safeFat.filter(f => f.type === 'honorarios_fixos').reduce((sum, f) => sum + Number(f.amount), 0),
-    por_demanda: safeFat.filter(f => f.type === 'por_demanda').reduce((sum, f) => sum + Number(f.amount), 0),
-    reembolso: safeFat.filter(f => f.type === 'reembolso').reduce((sum, f) => sum + Number(f.amount), 0),
+    honorario_fixo: safeFat.filter(f => f.type === 'honorarios_fixos').reduce((sum: number, f: Faturamento) => sum + Number(f.amount), 0),
+    por_demanda: safeFat.filter(f => f.type === 'por_demanda').reduce((sum: number, f: Faturamento) => sum + Number(f.amount), 0),
+    reembolso: safeFat.filter(f => f.type === 'reembolso').reduce((sum: number, f: Faturamento) => sum + Number(f.amount), 0),
   }
 
   return {
@@ -176,7 +172,7 @@ export async function getInadimplenciaWidget(userId: string) {
     byMonth[monthKey] = { total: 0, atrasado: 0 }
   }
 
-  safeFat.forEach(f => {
+  safeFat.forEach((f: any) => {
     const monthKey = f.created_at.substring(0, 7)
     if (byMonth[monthKey]) {
       const amount = Number(f.amount)
@@ -216,7 +212,7 @@ export async function getCobrancasPendentes(userId: string, period: DashboardPer
     .lte('created_at', endDate)
 
   const pendentes = data || []
-  const total = pendentes.reduce((sum, f) => sum + Number(f.amount), 0)
+  const total = pendentes.reduce((sum: number, f: any) => sum + Number(f.amount), 0)
 
   // Variation calc against previous period (same size)
   const currentStart = new Date(startDate)
@@ -235,7 +231,7 @@ export async function getCobrancasPendentes(userId: string, period: DashboardPer
     .lte('created_at', priorEnd.toISOString())
 
   const priorPendentes = priorData || []
-  const priorTotal = priorPendentes.reduce((sum, f) => sum + Number(f.amount), 0)
+  const priorTotal = priorPendentes.reduce((sum: number, f: any) => sum + Number(f.amount), 0)
 
   const variation = priorTotal > 0 ? ((total - priorTotal) / priorTotal) * 100 : (total > 0 ? 100 : 0)
 

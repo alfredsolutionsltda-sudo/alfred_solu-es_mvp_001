@@ -5,7 +5,7 @@ export async function getClients(userId: string, filters?: { status?: string, se
   const supabase = await createSupabaseServerClient();
   
   let query = supabase.from('clients').select(`
-    id, user_id, name, type, cpf_cnpj, status, status_manual, email, phone, created_at, updated_at, inadimplency_score, industry, notes,
+    id, user_id, name, type, cpf_cnpj, status, status_manual, email, phone, company_name, cnpj, industry, notes, website, created_at, updated_at, inadimplency_score, alfred_context,
     faturamento ( amount, status ),
     contracts ( id, status, end_date, slug )
   `).eq('user_id', userId);
@@ -26,7 +26,10 @@ export async function getClients(userId: string, filters?: { status?: string, se
 
   const { data: clientsData, error } = await query.order('name', { ascending: true });
 
-  if (error) throw error;
+  if (error) {
+    console.error('Error fetching clients:', error);
+    throw new Error(`Erro ao buscar clientes: ${error.message} (Código: ${error.code})`);
+  }
 
   const enrichedClients: ClientWithMetrics[] = clientsData.map((client: any) => {
     let billed = 0;
@@ -81,7 +84,11 @@ export async function getClientById(userId: string, clientId: string) {
     .eq('user_id', userId)
     .single();
 
-  if (error) throw error;
+  if (error) {
+    console.error(`Error fetching client ${clientId}:`, error);
+    if (error.code === 'PGRST116') return null; // Not found
+    throw new Error(`Erro ao buscar detalhes do cliente: ${error.message}`);
+  }
   if (!client) return null;
 
   let billed = 0;
@@ -130,7 +137,10 @@ export async function getClientMetrics(userId: string) {
     .select('id, status, contracts(id, status)')
     .eq('user_id', userId);
     
-  if (error) throw error;
+  if (error) {
+    console.error('Error fetching client metrics:', error);
+    throw new Error(`Erro ao calcular métricas de clientes: ${error.message}`);
+  }
 
   const total = clients.length;
   let ativos = 0;
@@ -247,48 +257,4 @@ export async function importClientsFromCSV(userId: string, rows: ClientFormData[
   }
 
   return { imported: toInsert.length, skipped, errors: null };
-}
-
-export async function updateInadimplencyScore(clientId: string) {
-  const supabase = await createSupabaseServerClient();
-  
-  const { data: faturas, error } = await supabase
-    .from('faturamento')
-    .select('status, due_date, paid_at')
-    .eq('client_id', clientId);
-    
-  if (error) throw error;
-  
-  let score = 100;
-  const hoje = new Date();
-  
-  if (faturas && faturas.length > 0) {
-    for (const f of faturas) {
-      const dataVenc = new Date(f.due_date);
-      if (f.status === 'atrasado') {
-        score -= 20;
-      } else if (f.status === 'pendente') {
-        const diffEmDias = Math.floor((hoje.getTime() - dataVenc.getTime()) / (1000 * 3600 * 24));
-        if (diffEmDias > 15) {
-          score -= 10;
-        }
-      } else if (f.status === 'pago') {
-        if (f.paid_at) {
-          const pagoEm = new Date(f.paid_at);
-          if (pagoEm < dataVenc) { 
-            score += 5;
-          }
-        }
-      }
-    }
-  }
-  
-  score = Math.max(0, Math.min(100, score));
-  
-  await supabase
-    .from('clients')
-    .update({ inadimplency_score: score })
-    .eq('id', clientId);
-    
-  return score;
 }

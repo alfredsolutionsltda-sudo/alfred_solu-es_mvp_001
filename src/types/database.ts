@@ -33,7 +33,14 @@ export interface Client {
   phone: string | null
   cpf_cnpj: string | null
   type: 'pessoa_fisica' | 'pessoa_juridica'
-  status: 'ativo' | 'inativo' | 'prospecto'
+  status: 'ativo' | 'inativo' | 'prospecto' | 'inadimplente'
+  status_manual: string | null
+  inadimplency_score: number
+  company_name: string | null
+  cnpj: string | null
+  industry: string | null
+  website: string | null
+  alfred_context: string | null
   notes: string | null
   created_at: string
   updated_at: string
