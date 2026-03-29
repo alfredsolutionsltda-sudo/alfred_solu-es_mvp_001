@@ -71,6 +71,8 @@ export default function CadastroPage() {
               src="/images/alfred-head.png" 
               alt="Alfred" 
               fill
+              priority
+              sizes="(max-width: 768px) 80px, 100px"
               className="object-contain p-1.5"
             />
           </div>
