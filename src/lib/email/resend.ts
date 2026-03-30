@@ -1,4 +1,5 @@
 import { Resend } from 'resend'
+import { buildUrl } from '@/lib/url'
 
 function getResendClient() {
   const apiKey = process.env.RESEND_API_KEY
@@ -22,8 +23,7 @@ export async function sendContractSignedEmail(
   to: string,
   data: ContractSignedEmailData
 ) {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
-  const contractUrl = `${appUrl}/contrato/${data.contractSlug}`
+  const contractUrl = buildUrl(`/contrato/${data.contractSlug}`)
 
   const signedDate = new Date(data.signedAt).toLocaleString('pt-BR', {
     dateStyle: 'long',

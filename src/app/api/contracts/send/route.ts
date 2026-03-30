@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { Resend } from 'resend'
+import { buildUrl } from '@/lib/url'
 
 export async function POST(request: Request) {
   const resend = new Resend(process.env.RESEND_API_KEY)
@@ -32,8 +33,7 @@ export async function POST(request: Request) {
       .single()
 
     const professionalName = profile?.full_name || 'Seu Profissional'
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
-    const contractUrl = `${appUrl}/contrato/${slug}`
+    const contractUrl = buildUrl(`/contrato/${slug}`)
 
     // Envia o e-mail via Resend
     const { data, error } = await resend.emails.send({
