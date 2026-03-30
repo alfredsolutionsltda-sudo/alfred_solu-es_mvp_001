@@ -25,11 +25,15 @@ export async function registerPaymentAction(userId: string, data: any) {
       .from('faturamento')
       .insert({
         user_id: userId,
+        client_id: data.originType === 'client' ? data.clientId : null,
         amount: data.amount,
-        date: data.date,
+        due_date: data.date,
+        paid_at: data.status === 'pago' ? data.date : null,
         status: data.status,
-        description: data.description,
-        type: data.category
+        description: data.originType === 'other' && data.customSource 
+          ? `${data.customSource}: ${data.description}` 
+          : data.description,
+        type: data.category === 'honorario_fixo' ? 'honorarios_fixos' : data.category
       });
       
     if (error) return { success: false, error: error.message };

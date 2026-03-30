@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { X, DollarSign, Calendar, Tag, FileText, CheckCircle2, Upload } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { registerPaymentAction, markObrigacaoAsPaidAction } from "@/app/actions/fiscalActions";
+import { getClientsAction } from "@/app/actions/clientActions";
 
 export default function RegisterPaymentModal({ 
   isOpen, 
@@ -23,13 +24,31 @@ export default function RegisterPaymentModal({
     date: prefillData?.date || new Date().toISOString().split('T')[0],
     category: prefillData?.type === 'imposto' ? 'SIMPLES' : 'honorario_fixo',
     status: 'pago',
-    description: prefillData?.name || ''
+    description: prefillData?.name || '',
+    originType: 'client' as 'client' | 'other',
+    clientId: '',
+    customSource: ''
   });
+  
+  const [clients, setClients] = useState<any[]>([]);
   
   const [file, setFile] = useState<File | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+
+  // Carrega clientes
+  useEffect(() => {
+    async function loadClients() {
+      if (formData.type === 'faturamento') {
+        const result = await getClientsAction(userId);
+        if (result.success) {
+          setClients(result.clients || []);
+        }
+      }
+    }
+    loadClients();
+  }, [userId, formData.type]);
 
   // Sincroniza form quando prefillData muda
   useEffect(() => {
@@ -40,7 +59,10 @@ export default function RegisterPaymentModal({
         date: prefillData.date,
         category: prefillData.type === 'imposto' ? 'SIMPLES' : 'honorario_fixo',
         status: 'pago',
-        description: prefillData.name
+        description: prefillData.name,
+        originType: 'client',
+        clientId: '',
+        customSource: ''
       });
     }
   }, [prefillData]);
@@ -131,6 +153,59 @@ export default function RegisterPaymentModal({
                   Imposto
                 </button>
               </div>
+
+              {/* Origem do Dinheiro (apenas para faturamento) */}
+              {formData.type === 'faturamento' && (
+                <div className="space-y-4 p-4 bg-[#F9FAFB] border border-[#E2E3E1] rounded-2xl">
+                  <div className="flex justify-between items-center mb-2">
+                    <label className="text-[10px] font-bold text-[#1A1C1B] uppercase tracking-wider">Origem do Dinheiro</label>
+                    <div className="flex bg-white border border-[#E2E3E1] p-1 rounded-xl">
+                      <button 
+                        type="button"
+                        onClick={() => setFormData({...formData, originType: 'client'})}
+                        className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all ${formData.originType === 'client' ? 'bg-[#1455CE] text-white' : 'text-[#6B6D6B]'}`}
+                      >
+                        Cliente
+                      </button>
+                      <button 
+                        type="button"
+                        onClick={() => setFormData({...formData, originType: 'other'})}
+                        className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all ${formData.originType === 'other' ? 'bg-[#1455CE] text-white' : 'text-[#6B6D6B]'}`}
+                      >
+                        Outro
+                      </button>
+                    </div>
+                  </div>
+
+                  {formData.originType === 'client' ? (
+                    <div className="relative">
+                      <select 
+                        value={formData.clientId}
+                        onChange={(e) => setFormData({...formData, clientId: e.target.value})}
+                        className="w-full px-4 py-3 bg-white border border-[#E2E3E1] rounded-xl text-xs font-bold outline-none appearance-none"
+                      >
+                        <option value="">Selecione o Cliente...</option>
+                        {clients.map(c => (
+                          <option key={c.id} value={c.id}>{c.name}</option>
+                        ))}
+                      </select>
+                      <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
+                        <Tag className="w-3 h-3 text-[#6B6D6B]" />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="relative">
+                      <input 
+                        type="text"
+                        placeholder="De onde veio o pagamento?"
+                        value={formData.customSource}
+                        onChange={(e) => setFormData({...formData, customSource: e.target.value})}
+                        className="w-full px-4 py-3 bg-white border border-[#E2E3E1] rounded-xl text-xs font-bold outline-none"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-2">

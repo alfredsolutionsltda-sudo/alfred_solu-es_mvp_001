@@ -28,3 +28,12 @@ export async function updateClientStatusAction(userId: string, clientId: string,
     return { success: false, error: error.message };
   }
 }
+export async function getClientsAction(userId: string) {
+  try {
+    const { getClients } = await import("@/lib/data/clients");
+    const clients = await getClients(userId);
+    return { success: true, clients };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
