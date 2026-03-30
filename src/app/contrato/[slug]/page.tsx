@@ -1,6 +1,7 @@
 import { getContractBySlug } from '@/lib/data/contracts'
 import SignatureForm from './SignatureForm'
 import DownloadButton from './DownloadButton'
+import Image from 'next/image'
 import { FileText, Bot, CheckCircle } from 'lucide-react'
 
 export async function generateMetadata(props: { params: Promise<{ slug: string }> }) {
@@ -49,12 +50,18 @@ export default async function ContratoPublicPage(props: {
     })
 
     return (
-      <div className="flex-1 flex flex-col no-print bg-[#EFEFED] min-h-screen">
+      <div className="flex-1 flex flex-col bg-[#EFEFED] min-h-screen">
         {/* Header */}
         <header className="py-6 px-8 border-b border-neutral-200/40 bg-white/60 backdrop-blur-xl no-print">
           <div className="max-w-[720px] mx-auto flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-[#1455CE] p-1.5 shadow-lg shadow-[#1455CE]/20">
-              <Bot className="text-white" size={20} />
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-white shadow-sm border border-neutral-100 overflow-hidden">
+              <Image
+                src="/images/alfred-head.png"
+                alt="Alfred"
+                width={36}
+                height={36}
+                className="object-contain p-1"
+              />
             </div>
             <div>
               <span className="text-lg font-headline font-black text-neutral-900 tracking-tight">
@@ -161,12 +168,18 @@ export default async function ContratoPublicPage(props: {
   }
 
   return (
-    <div className="flex-1 flex flex-col no-print bg-[#EFEFED] min-h-screen">
+    <div className="flex-1 flex flex-col bg-[#EFEFED] min-h-screen">
       {/* Header */}
       <header className="py-6 px-8 border-b border-neutral-200/40 bg-white/60 backdrop-blur-xl no-print">
         <div className="max-w-[720px] mx-auto flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-[#1455CE] p-1.5 shadow-lg shadow-[#1455CE]/20">
-            <Bot className="text-white" size={20} />
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-white shadow-sm border border-neutral-100 overflow-hidden">
+            <Image
+              src="/images/alfred-head.png"
+              alt="Alfred"
+              width={36}
+              height={36}
+              className="object-contain p-1"
+            />
           </div>
           <div>
             <span className="text-lg font-headline font-black text-neutral-900 tracking-tight">
