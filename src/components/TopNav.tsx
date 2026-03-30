@@ -16,8 +16,14 @@ import {
   LogOut, 
   LayoutDashboard,
   Menu,
-  X
+  X,
+  AlertTriangle,
+  Info,
+  Calendar,
+  Clock,
+  ChevronRight
 } from 'lucide-react'
+import { getContractAlertsAction } from '@/app/actions/contractActions'
 
 const navLinks = [
   { href: '/dashboard', label: 'Início', icon: LayoutDashboard },
@@ -39,7 +45,11 @@ export default function TopNav({ userEmail, userName }: TopNavProps) {
   const supabase = createClient()
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false)
+  const [alerts, setAlerts] = useState<any[]>([])
+  const [unreadCount, setUnreadCount] = useState(0)
   const dropdownRef = useRef<HTMLDivElement>(null)
+  const notificationsRef = useRef<HTMLDivElement>(null)
 
   const displayName = userName || (userEmail?.split('@')[0] ?? 'Usuário')
 
@@ -55,9 +65,27 @@ export default function TopNav({ userEmail, userName }: TopNavProps) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsDropdownOpen(false)
       }
+      if (notificationsRef.current && !notificationsRef.current.contains(event.target as Node)) {
+        setIsNotificationsOpen(false)
+      }
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  // Busca alertas inicialmente e a cada 5 minutos
+  useEffect(() => {
+    const fetchAlerts = async () => {
+      const res = await getContractAlertsAction()
+      if (res.success) {
+        setAlerts(res.data || [])
+        setUnreadCount(res.count || 0)
+      }
+    }
+
+    fetchAlerts()
+    const interval = setInterval(fetchAlerts, 5 * 60 * 1000)
+    return () => clearInterval(interval)
   }, [])
 
   // Lock scroll when drawer is open
@@ -124,14 +152,83 @@ export default function TopNav({ userEmail, userName }: TopNavProps) {
         {/* Ações do usuário */}
         <div className="flex items-center gap-2 md:gap-6">
           {/* Notificações */}
-          <button
-            id="btn-notifications"
-            className="relative p-2 md:p-2.5 hover:bg-neutral-50 rounded-[14px] transition-all group border border-transparent hover:border-neutral-100"
-            aria-label="Notificações"
-          >
-            <Bell className="text-neutral-400 group-hover:text-[#1455CE] transition-colors" size={20} />
-            <span className="absolute top-2 md:top-2.5 right-2 md:right-2.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white animate-pulse" />
-          </button>
+          <div className="relative" ref={notificationsRef}>
+            <button
+              onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
+              className="relative p-2 md:p-2.5 hover:bg-neutral-50 rounded-[14px] transition-all group border border-transparent hover:border-neutral-100"
+              aria-label="Notificações"
+            >
+              <Bell className={`${unreadCount > 0 ? 'text-[#1455CE]' : 'text-neutral-400'} group-hover:text-[#1455CE] transition-colors`} size={20} />
+              {unreadCount > 0 && (
+                <span className="absolute top-2 md:top-2.5 right-2 md:right-2.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white animate-pulse" />
+              )}
+            </button>
+
+            {/* Dropdown de Notificações */}
+            {isNotificationsOpen && (
+              <div className="absolute right-0 top-[calc(100%+12px)] w-80 md:w-96 bg-white rounded-[24px] shadow-[0_20px_50px_rgba(0,0,0,0.15)] border border-neutral-100 overflow-hidden animate-in fade-in zoom-in-95 duration-200 origin-top-right z-[60]">
+                <div className="p-5 border-b border-neutral-50">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-black text-neutral-900 uppercase tracking-widest">Notificações</p>
+                    {unreadCount > 0 && (
+                      <span className="px-2 py-0.5 bg-[#1455CE]/10 text-[#1455CE] text-[10px] font-black rounded-full uppercase">
+                        {unreadCount} Novas
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="max-h-[400px] overflow-y-auto">
+                  {alerts.length === 0 ? (
+                    <div className="p-10 text-center">
+                       <Bell className="mx-auto text-neutral-100 mb-4" size={40} />
+                       <p className="text-xs font-bold text-neutral-400">Tudo em dia por aqui!</p>
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-neutral-50">
+                      {alerts.map((alert) => (
+                        <button
+                          key={alert.id}
+                          onClick={() => {
+                            setIsNotificationsOpen(false)
+                            router.push('/contratos')
+                            // O Drawer será aberto pela URL ou estado global se implementado, 
+                            // por enquanto levamos até a página de contratos
+                          }}
+                          className="w-full p-5 text-left hover:bg-neutral-50 transition-colors flex gap-4 group"
+                        >
+                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+                            alert.type === 'warning' ? 'bg-amber-50 text-amber-500' : 'bg-blue-50 text-blue-500'
+                          }`}>
+                            {alert.type === 'warning' ? <AlertTriangle size={18} /> : <Info size={18} />}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[10px] font-black uppercase tracking-widest text-[#1455CE] mb-1">{alert.title}</p>
+                            <p className="text-xs font-bold text-neutral-900 leading-tight mb-2">{alert.message}</p>
+                            <div className="flex items-center gap-2">
+                               <Clock size={10} className="text-neutral-300" />
+                               <span className="text-[9px] font-bold text-neutral-400 uppercase">Ver detalhes</span>
+                            </div>
+                          </div>
+                          <ChevronRight size={14} className="text-neutral-200 self-center group-hover:text-[#1455CE] transition-colors" />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {alerts.length > 0 && (
+                  <Link 
+                    href="/contratos"
+                    onClick={() => setIsNotificationsOpen(false)}
+                    className="block p-4 text-center text-[10px] font-black text-neutral-400 uppercase tracking-widest hover:text-[#1455CE] bg-neutral-50/50 transition-colors"
+                  >
+                    Ver todos os contratos
+                  </Link>
+                )}
+              </div>
+            )}
+          </div>
 
           {/* Avatar + Dropdown */}
           <div className="flex items-center gap-4 pl-4 md:pl-6 border-l border-neutral-100 relative" ref={dropdownRef}>

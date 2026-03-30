@@ -26,6 +26,12 @@ export interface Contract {
   public_token: string | null
   created_at: string
   updated_at: string
+  read_at?: string | null
+  total_reading_time?: number
+  rejection_reason?: string | null
+  rejected_at?: string | null
+  last_follow_up_at?: string | null
+  follow_up_count?: number
 }
 
 export interface ContractWithClient extends Contract {
@@ -92,6 +98,8 @@ export interface ContractMetrics {
   pendentesAssinatura: number
   vencendoEm30Dias: number
   valorTotalAtivo: number
+  taxaConversao?: number
+  totalPropostas?: number
 }
 
 export interface ContractFilters {

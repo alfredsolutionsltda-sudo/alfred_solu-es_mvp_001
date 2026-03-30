@@ -1,6 +1,7 @@
 import { getContractBySlug } from '@/lib/data/contracts'
 import SignatureForm from './SignatureForm'
 import DownloadButton from './DownloadButton'
+import ReadingTrack from '@/components/contracts/ReadingTrack'
 import Image from 'next/image'
 import { FileText, Bot, CheckCircle } from 'lucide-react'
 
@@ -226,6 +227,7 @@ export default async function ContratoPublicPage(props: {
           <SignatureForm slug={slug} />
         </div>
       </div>
+      <ReadingTrack slug={slug} />
     </div>
   )
 }

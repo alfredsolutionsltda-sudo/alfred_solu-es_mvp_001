@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import type { ContractWithClient } from '@/types/contracts'
-import { Search, MoreHorizontal, ChevronLeft, ChevronRight, FileText } from 'lucide-react'
+import { Search, MoreHorizontal, ChevronLeft, ChevronRight, FileText, AlertCircle, Eye } from 'lucide-react'
 
 interface ContractTableProps {
   contracts: any[] // Using any here to simplify, but you should use the correct type if available
@@ -210,6 +210,12 @@ export default function ContractTable({
               const status = statusConfig[contract.status] || statusConfig['rascunho']
               const isSelected = selectedContractId === contract.id
 
+              // Lógica de "esquecida" (> 3 dias sem leitura em status pendente/enviado)
+              const isStale = isProposals && 
+                ['enviado', 'pendente_assinatura'].includes(contract.status) &&
+                !contract.read_at &&
+                new Date(contract.created_at).getTime() < (Date.now() - 3 * 24 * 60 * 60 * 1000);
+
               return (
                 <tr
                   key={contract.id}
@@ -220,7 +226,12 @@ export default function ContractTable({
                 >
                   {/* Cliente */}
                   <td className="px-8 py-5">
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-4 relative">
+                      {isStale && (
+                        <div className="absolute -left-6 top-1/2 -translate-y-1/2 text-amber-500 animate-pulse" title="Proposta enviada há mais de 3 dias e ainda não visualizada">
+                          <AlertCircle size={16} strokeWidth={3} />
+                        </div>
+                      )}
                       <div className="w-10 h-10 rounded-xl bg-[#1455CE]/10 flex items-center justify-center shrink-0 border border-[#1455CE]/5">
                         <span className="text-xs font-black text-[#1455CE]">
                           {contract.client ? getInitials(contract.client.name) : '??'}
@@ -265,6 +276,11 @@ export default function ContractTable({
                     >
                       <span className={`w-1.5 h-1.5 rounded-full ${status.dot} animate-pulse`} />
                       {status.label}
+                      {isProposals && contract.read_at && (
+                        <span title="Visualizado">
+                          <Eye size={12} className="ml-1 text-[#1455CE]" />
+                        </span>
+                      )}
                     </span>
                   </td>
 

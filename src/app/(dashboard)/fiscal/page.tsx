@@ -83,7 +83,7 @@ export default async function FiscalPage() {
 
         {/* Coluna Direita: Calculadora e Alfred (Menor) */}
         <div className="lg:col-span-4 flex flex-col gap-6 md:gap-8 lg:sticky lg:top-24">
-          <TaxCalculator />
+          <TaxCalculator userId={userId} />
           <AlfredFiscal userId={userId} />
         </div>
       </div>

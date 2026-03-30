@@ -31,6 +31,7 @@ export async function getContracts(
     .from('contracts')
     .select(`
       id, user_id, client_id, title, description, value, status, start_date, end_date, signed_at, public_token, created_at, updated_at, slug, version, payment_terms, service_type, contract_body,
+      read_at, total_reading_time, rejection_reason, rejected_at, last_follow_up_at, follow_up_count,
       client:clients (
         id, user_id, name, type, cpf_cnpj, status, status_manual, email, phone, company_name, cnpj, industry, notes, website, created_at, updated_at, inadimplency_score, alfred_context
       )
@@ -140,11 +141,21 @@ export async function getContractMetrics(
   const valorTotalAtivo =
     valorAtivoData?.reduce((sum, c) => sum + Number(c.value || 0), 0) || 0
 
+  // Cálculo de conversão para propostas
+  const { count: totalPropostas } = await supabase
+    .from('contracts')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId)
+
+  const taxaConversao = totalPropostas ? Math.round(((totalAtivos || 0) / totalPropostas) * 100) : 0
+
   return {
     totalAtivos: totalAtivos || 0,
     pendentesAssinatura: pendentesAssinatura || 0,
     vencendoEm30Dias: vencendoEm30Dias || 0,
     valorTotalAtivo,
+    taxaConversao,
+    totalPropostas: totalPropostas || 0
   }
 }
 
@@ -271,6 +282,13 @@ export async function signContract(
     return null
   }
 
+  // Após assinar, move o contrato para o status 'ativo' para que seja 
+  // contabilizado nas métricas e apareça no dashboard.
+  await serviceClient
+    .from('contracts')
+    .update({ status: 'ativo' })
+    .eq('slug', slug)
+
   return data
 }
 
@@ -363,4 +381,62 @@ export async function renewContract(
     .eq('user_id', userId)
 
   return renewed as unknown as ContractWithClient
+}
+
+// ─────────────────────────────────────────
+// getContractAlerts
+// ─────────────────────────────────────────
+export async function getContractAlerts(userId: string) {
+  const supabase = await createClient()
+
+  // 1. Contratos que vencem nos próximos 15 dias
+  const hoje = new Date()
+  const em15Dias = new Date()
+  em15Dias.setDate(em15Dias.getDate() + 15)
+
+  const { data: expiringContracts } = await supabase
+    .from('contracts')
+    .select('id, title, end_date, client:clients(name)')
+    .eq('user_id', userId)
+    .in('status', ['ativo', 'vencendo'])
+    .gte('end_date', hoje.toISOString().split('T')[0])
+    .lte('end_date', em15Dias.toISOString().split('T')[0])
+
+  // 2. Propostas "esquecidas" (> 3 dias sem leitura)
+  const tresDiasAtras = new Date()
+  tresDiasAtras.setDate(tresDiasAtras.getDate() - 3)
+
+  const { data: staleProposals } = await supabase
+    .from('contracts')
+    .select('id, title, created_at, client:clients(name)')
+    .eq('user_id', userId)
+    .in('status', ['enviado', 'pendente_assinatura'])
+    .is('read_at', null)
+    .lt('created_at', tresDiasAtras.toISOString())
+
+  const alerts: any[] = []
+
+  expiringContracts?.forEach((c: any) => {
+    alerts.push({
+      id: `exp-${c.id}`,
+      contractId: c.id,
+      title: 'Contrato Vencendo',
+      message: `O contrato de "${c.client?.name || 'Cliente'}" vence em breve (${new Date(c.end_date).toLocaleDateString('pt-BR')}).`,
+      type: 'warning',
+      date: c.end_date
+    })
+  })
+
+  staleProposals?.forEach((c: any) => {
+    alerts.push({
+      id: `stale-${c.id}`,
+      contractId: c.id,
+      title: 'Proposta Parada',
+      message: `A proposta para "${c.client?.name || 'Cliente'}" ainda não foi visualizada.`,
+      type: 'info',
+      date: c.created_at
+    })
+  })
+
+  return alerts
 }

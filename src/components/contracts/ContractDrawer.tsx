@@ -24,7 +24,10 @@ import {
   Loader2,
   MoreHorizontal,
   Trash2,
-  Ban
+  Ban,
+  TrendingUp,
+  MessageSquare,
+  Clock
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { updateContractStatusAction } from '@/app/actions/contractActions'
@@ -36,7 +39,7 @@ interface ContractDrawerProps {
   mode?: 'contracts' | 'proposals'
 }
 
-type TabKey = 'contrato' | 'analise' | 'clausulas' | 'alfred'
+type TabKey = 'contrato' | 'analise' | 'clausulas' | 'alfred' | 'negociacao' | 'followup'
 
 const statusConfig: Record<string, { label: string; bg: string; text: string; dot: string }> = {
   ativo: { label: 'Ativo', bg: 'bg-green-50', text: 'text-green-700', dot: 'bg-green-500' },
@@ -87,11 +90,27 @@ export default function ContractDrawer({
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   const tabs: { key: TabKey; label: string; icon: any }[] = [
-    { key: 'contrato', label: isProposals ? 'Proposta' : 'Contrato', icon: FileText },
-    { key: 'analise', label: 'Risco', icon: Shield },
-    { key: 'clausulas', label: 'Cláusulas', icon: Hammer },
-    { key: 'alfred', label: 'Alfred', icon: Bot },
+    { key: 'contrato' as TabKey, label: isProposals ? 'Proposta' : 'Contrato', icon: FileText },
+    ...(isProposals 
+      ? [
+          { key: 'negociacao' as TabKey, label: 'Negociar', icon: TrendingUp },
+          { key: 'followup' as TabKey, label: 'Follow-up', icon: MessageSquare }
+        ] 
+      : []),
+    { key: 'analise' as TabKey, label: 'Risco', icon: Shield },
+    { key: 'clausulas' as TabKey, label: 'Cláusulas', icon: Hammer },
+    { key: 'alfred' as TabKey, label: 'Alfred', icon: Bot },
   ]
+
+  const [margin, setMargin] = useState(20)
+  const [followupLoading, setFollowupLoading] = useState(false)
+  const [followupMessage, setFollowupMessage] = useState('')
+
+  const [riskAnalysis, setRiskAnalysis] = useState<string | null>(null)
+  const [loadingRisk, setLoadingRisk] = useState(false)
+
+  const [clauseExplanation, setClauseExplanation] = useState<{ index: number; text: string } | null>(null)
+  const [loadingClause, setLoadingClause] = useState(false)
 
   const [sendingEmail, setSendingEmail] = useState(false)
 
@@ -171,6 +190,39 @@ export default function ContractDrawer({
     }
   }
 
+  const handleGenerateFollowup = async (tone: 'suave' | 'neutro' | 'firme') => {
+    if (!contract) return
+    setFollowupLoading(true)
+    try {
+      const waitTime = contract.created_at ? Math.floor((Date.now() - new Date(contract.created_at).getTime()) / (1000 * 60 * 60 * 24)) : 0
+      
+      const res = await fetch('/api/ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: contract.user_id,
+          messages: [
+            { 
+              role: 'user', 
+              content: `Gere um texto de follow-up para a proposta "${contract.title}" enviada para ${contract.client?.name}. O tom deve ser ${tone}. A proposta foi enviada há ${waitTime} dias. O valor é ${formatCurrency(contract.value)}.` 
+            }
+          ],
+          systemPrompt: `Você é o Alfred. Crie uma mensagem de follow-up curta e eficaz para WhatsApp ou E-mail. 
+          Suave: Lembrete gentil, focado em ajudar.
+          Neutro: Profissional, perguntando se houve leitura.
+          Firme: Focado em fechamento de agenda e validade da proposta.
+          Responda APENAS com o texto da mensagem.`,
+        }),
+      })
+      const data = await res.json()
+      setFollowupMessage(data.choices?.[0]?.message?.content || '')
+    } catch {
+      alert('Erro ao gerar follow-up')
+    } finally {
+      setFollowupLoading(false)
+    }
+  }
+
   const handleAlfredSubmit = async () => {
     if (!alfredInput.trim() || !contract) return
 
@@ -213,6 +265,61 @@ export default function ContractDrawer({
       ])
     } finally {
       setAlfredLoading(false)
+    }
+  }
+
+  const handleAnalyzeRisk = async () => {
+    if (!contract || loadingRisk) return
+    setLoadingRisk(true)
+    try {
+      const res = await fetch('/api/ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: contract.user_id,
+          messages: [
+            { 
+              role: 'user', 
+              content: `Analise os riscos deste contrato: ${contract.contract_body?.substring(0, 3000)}. Identifique riscos financeiros, operacionais e jurídicos. Responda em tópicos curtos e objetivos.` 
+            }
+          ],
+          systemPrompt: "Você é um especialista em análise de risco contratual. Identifique pontos de atenção, riscos de compliance e vantagens financeiras. Seja direto e use português brasileiro.",
+        }),
+      })
+      const data = await res.json()
+      setRiskAnalysis(data.choices?.[0]?.message?.content || 'Não foi possível analisar os riscos.')
+    } catch {
+      alert('Erro ao analisar os riscos.')
+    } finally {
+      setLoadingRisk(false)
+    }
+  }
+
+  const handleExplainClause = async (clauseTitle: string, index: number) => {
+    if (!contract || loadingClause) return
+    setLoadingClause(true)
+    setClauseExplanation({ index, text: '' })
+    try {
+      const res = await fetch('/api/ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: contract.user_id,
+          messages: [
+            { 
+              role: 'user', 
+              content: `Explique de forma simples e didática o que significa a cláusula "${clauseTitle}" em um contrato de ${contract.service_type}. Use no máximo 3 frases.` 
+            }
+          ],
+          systemPrompt: "Você é o Alfred, assistente jurídico. Explique cláusulas contratuais de forma simples para quem não é advogado.",
+        }),
+      })
+      const data = await res.json()
+      setClauseExplanation({ index, text: data.choices?.[0]?.message?.content || 'Não consegui explicar agora.' })
+    } catch {
+      alert('Erro ao explicar cláusula.')
+    } finally {
+      setLoadingClause(false)
     }
   }
 
@@ -311,6 +418,30 @@ export default function ContractDrawer({
             </div>
           </div>
 
+          {/* Barra de assinatura (se assinado) - Movida para o topo para melhor visibilidade */}
+          {contract.signed_at && (
+            <div className="mb-6 p-4 md:p-5 border border-green-100 bg-green-50/50 rounded-[24px] shadow-sm animate-in fade-in slide-in-from-top-2 duration-500">
+              <div className="flex items-center gap-3 md:gap-4">
+                <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl bg-green-600 text-white flex items-center justify-center shrink-0 shadow-lg shadow-green-600/20">
+                  <Verified className="w-5 h-5 md:w-6 md:h-6" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] font-black text-green-600 uppercase tracking-widest mb-1">
+                    Contrato Assinado
+                  </p>
+                  <p className="text-xs md:text-sm font-black text-neutral-900 tracking-tight leading-none mb-1 truncate">
+                    {contract.signed_by_name}
+                  </p>
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[8px] md:text-[9px] font-bold text-neutral-400 uppercase tracking-widest">
+                    <span>{formatDate(contract.signed_at)}</span>
+                    <span className="w-0.5 h-0.5 md:w-1 md:h-1 rounded-full bg-neutral-200" />
+                    <span className="truncate">IP: {contract.signed_by_ip || '---'}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Botões de ação */}
           <div className="flex gap-2 md:gap-3">
             <button
@@ -339,6 +470,15 @@ export default function ContractDrawer({
               {sendingEmail ? <Loader2 size={12} className="md:size-3.5 animate-spin" /> : <Mail size={12} className="md:size-3.5 stroke-[3px]" />}
               {sendingEmail ? '...' : 'Enviar'}
             </button>
+            {contract.status === 'vencendo' && (
+              <button 
+                onClick={() => alert('Funcionalidade de renovação será aberta em breve!')}
+                className="flex-[1.5] flex items-center justify-center gap-1.5 md:gap-2 py-3 md:py-3.5 rounded-xl md:rounded-2xl bg-amber-500 text-white hover:bg-amber-600 text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all no-print shadow-lg shadow-amber-500/10"
+              >
+                <RefreshCcw size={12} className="md:size-3.5 stroke-[3px]" />
+                Renovar
+              </button>
+            )}
           </div>
         </div>
 
@@ -375,52 +515,212 @@ export default function ContractDrawer({
                   {contract.contract_body || (isProposals ? 'Texto da proposta não disponível.' : 'Texto do contrato não disponível.')}
                 </div>
               </div>
+              
+              {/* Estatísticas de Leitura (se houver) */}
+              {isProposals && contract.read_at && (
+                <div className="mt-8 grid grid-cols-2 gap-4">
+                  <div className="bg-neutral-50 p-5 rounded-[24px] border border-neutral-100 flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center text-green-600">
+                      <Clock size={18} />
+                    </div>
+                    <div>
+                      <p className="text-[8px] font-black uppercase text-neutral-400">Primeira Leitura</p>
+                      <p className="text-xs font-black text-neutral-900">{formatDate(contract.read_at)}</p>
+                    </div>
+                  </div>
+                  <div className="bg-neutral-50 p-5 rounded-[24px] border border-neutral-100 flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-[#1455CE]/5 flex items-center justify-center text-[#1455CE]">
+                      <History size={18} />
+                    </div>
+                    <div>
+                      <p className="text-[8px] font-black uppercase text-neutral-400">Tempo de Leitura</p>
+                      <p className="text-xs font-black text-neutral-900">
+                        {Math.floor((contract.total_reading_time || 0) / 60)} min {(contract.total_reading_time || 0) % 60}s
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'negociacao' && (
+            <div className="p-6 md:p-10 md:pt-8 space-y-6 md:space-y-8 pb-24 md:pb-10 animate-in fade-in duration-500">
+              <div className="bg-white border border-neutral-100 rounded-[32px] p-8 shadow-sm">
+                <h3 className="text-sm font-black text-neutral-900 uppercase tracking-widest mb-6 flex items-center gap-2">
+                  <TrendingUp className="text-[#1455CE]" size={16} />
+                  Simulador de Margem
+                </h3>
+                
+                <div className="space-y-6">
+                  <div>
+                    <div className="flex justify-between mb-2">
+                      <span className="text-[10px] font-black text-neutral-400 uppercase tracking-widest">Margem de Segurança (%)</span>
+                      <span className="text-sm font-black text-[#1455CE]">{margin}%</span>
+                    </div>
+                    <input 
+                      type="range" 
+                      min="5" 
+                      max="60" 
+                      value={margin} 
+                      onChange={(e) => setMargin(Number(e.target.value))}
+                      className="w-full h-2 bg-neutral-100 rounded-lg appearance-none cursor-pointer accent-[#1455CE]"
+                    />
+                  </div>
+                  
+                  <div className="h-px bg-neutral-50" />
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="p-5 bg-neutral-50 rounded-[24px] border border-neutral-100">
+                      <p className="text-[8px] font-black text-neutral-400 uppercase mb-1">Custo Estimado</p>
+                      <p className="text-lg font-black text-neutral-900">{formatCurrency((contract.value || 0) * 0.4)}</p>
+                    </div>
+                    <div className="p-5 bg-[#1455CE]/5 rounded-[24px] border border-[#1455CE]/10">
+                      <p className="text-[8px] font-black text-[#1455CE] uppercase mb-1">Lucro Projetado</p>
+                      <p className="text-lg font-black text-[#1455CE]">
+                        {formatCurrency((contract.value || 0) * (margin/100))}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="p-6 bg-green-50/50 border border-green-100 rounded-[28px] text-center">
+                    <p className="text-[10px] font-black text-green-600 uppercase tracking-widest mb-2">Preço de Equilíbrio Recomentado</p>
+                    <p className="text-3xl font-headline font-black text-green-700 tracking-tighter">
+                      {formatCurrency((contract.value || 0) * (1 + margin/200))}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'followup' && (
+            <div className="p-6 md:p-10 md:pt-8 bg-neutral-50/50 flex flex-col h-full overflow-hidden">
+               <div className="mb-6">
+                <h3 className="text-sm font-black text-neutral-900 uppercase tracking-widest mb-4 flex items-center gap-2">
+                  <MessageSquare className="text-[#1455CE]" size={16} />
+                  Alfred Follow-up
+                </h3>
+                <p className="text-xs text-neutral-500 font-bold leading-relaxed">
+                  Escolha o tom para que o Alfred gere uma mensagem personalizada de acompanhamento.
+                </p>
+               </div>
+
+               <div className="grid grid-cols-3 gap-3 mb-6">
+                  {['suave', 'neutro', 'firme'].map((t) => (
+                    <button
+                      key={t}
+                      onClick={() => handleGenerateFollowup(t as any)}
+                      disabled={followupLoading}
+                      className="py-3 px-2 rounded-xl text-[10px] font-black uppercase tracking-widest bg-white border border-neutral-200 hover:border-[#1455CE] hover:text-[#1455CE] transition-all active:scale-95 disabled:opacity-50"
+                    >
+                      {t}
+                    </button>
+                  ))}
+               </div>
+
+               <div className="flex-1 bg-white rounded-[32px] border border-neutral-100 p-8 shadow-inner overflow-y-auto relative min-h-[200px]">
+                  {followupLoading ? (
+                    <div className="absolute inset-0 flex items-center justify-center bg-white/80 rounded-[32px] z-10">
+                      <Loader2 className="animate-spin text-[#1455CE]" size={32} />
+                    </div>
+                  ) : followupMessage ? (
+                    <div className="animate-in fade-in duration-500">
+                      <p className="text-sm font-bold text-neutral-700 leading-relaxed italic">"{followupMessage}"</p>
+                      <button 
+                        onClick={() => {
+                          navigator.clipboard.writeText(followupMessage)
+                          alert('Copiado!')
+                        }}
+                        className="mt-6 flex items-center gap-2 text-[10px] font-black text-[#1455CE] uppercase tracking-widest hover:underline"
+                      >
+                        Copiar Mensagem
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center h-full text-center py-10 opacity-30">
+                       <Bot size={40} className="mb-4" />
+                       <p className="text-[10px] font-black uppercase tracking-widest">Nenhuma mensagem gerada</p>
+                    </div>
+                  )}
+               </div>
             </div>
           )}
 
           {activeTab === 'analise' && (
-            <div className="p-6 md:p-10 md:pt-8 space-y-6 md:space-y-8 pb-24 md:pb-10">
-              <div className="bg-[#1455CE]/5 rounded-[24px] p-5 md:p-6 border border-[#1455CE]/10">
-                <div className="flex items-center gap-3 mb-4">
-                  <Shield className="text-[#1455CE] w-[18px] h-[18px] md:w-5 md:h-5" />
-                  <h3 className="text-[11px] md:text-sm font-black text-neutral-900 uppercase tracking-widest">
-                    Análise Preditiva
-                  </h3>
-                </div>
-                <p className="text-[10px] md:text-xs text-neutral-500 font-bold leading-relaxed mb-6">
-                  O Alfred analisou os principais riscos operacionais e jurídicos {isProposals ? 'desta proposta' : 'deste contrato'}.
-                </p>
+            <div className="p-6 md:p-10 md:pt-8 space-y-6 md:space-y-8 pb-24 md:pb-10 animate-in fade-in duration-500">
+               <div className="bg-[#1455CE]/5 rounded-[32px] p-8 border border-[#1455CE]/10 relative overflow-hidden">
+                <div className="absolute -right-4 -top-4 w-24 h-24 bg-[#1455CE]/5 rounded-full blur-2xl" />
                 
-                <div className="space-y-3 md:space-y-4">
-                  <div className="p-3 md:p-4 bg-white rounded-xl md:rounded-2xl border border-neutral-100 shadow-sm flex items-start gap-3">
-                    <div className="w-7 h-7 md:w-8 md:h-8 rounded-lg md:rounded-xl bg-green-50 flex items-center justify-center shrink-0">
-                      <CheckCircle className="text-green-500 w-3.5 h-3.5 md:w-4 md:h-4" />
-                    </div>
-                    <div>
-                      <p className="text-[9px] md:text-[10px] font-black text-neutral-900 uppercase tracking-tight">Compliance</p>
-                      <p className="text-[9px] md:text-[10px] text-neutral-400 font-bold mt-1 leading-normal">O contrato segue as normas vigentes de proteção de dados.</p>
-                    </div>
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center gap-3">
+                    <Shield className="text-[#1455CE] w-5 h-5" />
+                    <h3 className="text-sm font-black text-neutral-900 uppercase tracking-widest">
+                      Análise de Risco Alfred
+                    </h3>
                   </div>
-                  <div className="p-3 md:p-4 bg-white rounded-xl md:rounded-2xl border border-neutral-100 shadow-sm flex items-start gap-3">
-                    <div className="w-7 h-7 md:w-8 md:h-8 rounded-lg md:rounded-xl bg-amber-50 flex items-center justify-center shrink-0">
-                      <AlertTriangle className="text-amber-500 w-3.5 h-3.5 md:w-4 md:h-4" />
-                    </div>
-                    <div>
-                      <p className="text-[9px] md:text-[10px] font-black text-neutral-900 uppercase tracking-tight">Vantagem Financeira</p>
-                      <p className="text-[9px] md:text-[10px] text-neutral-400 font-bold mt-1 leading-normal">A multa por atraso está abaixo da média do mercado para este setor.</p>
-                    </div>
-                  </div>
+                  {!riskAnalysis && !loadingRisk && (
+                    <button 
+                      onClick={handleAnalyzeRisk}
+                      className="px-4 py-2 bg-[#1455CE] text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-[#114ab3] transition-all shadow-lg shadow-[#1455CE]/10 active:scale-95 flex items-center gap-2"
+                    >
+                      <Bot size={14} />
+                      Analisar Agora
+                    </button>
+                  )}
                 </div>
+
+                {loadingRisk ? (
+                  <div className="py-12 flex flex-col items-center justify-center text-center">
+                    <Loader2 className="animate-spin text-[#1455CE] mb-4" size={32} />
+                    <p className="text-xs font-bold text-neutral-500">O Alfred está lendo as cláusulas e identificando riscos...</p>
+                  </div>
+                ) : riskAnalysis ? (
+                  <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-500">
+                     <div className="prose prose-sm prose-neutral max-w-none text-neutral-700 font-bold leading-relaxed whitespace-pre-wrap">
+                        {riskAnalysis}
+                     </div>
+                     <button 
+                        onClick={() => setRiskAnalysis(null)}
+                        className="text-[10px] font-black text-neutral-400 uppercase tracking-widest hover:text-neutral-900 transition-colors"
+                     >
+                       Nova Análise
+                     </button>
+                  </div>
+                ) : (
+                  <div className="py-6">
+                    <p className="text-xs text-neutral-500 font-bold leading-relaxed mb-6">
+                      Clique no botão acima para que o Alfred faça uma varredura completa nas cláusulas operacionais e jurídicas {isProposals ? 'desta proposta' : 'deste contrato'}.
+                    </p>
+                    
+                    <div className="grid grid-cols-2 gap-4 opacity-40 grayscale">
+                      <div className="p-4 bg-white/50 rounded-2xl border border-neutral-100 flex items-center gap-3">
+                        <CheckCircle className="text-green-500" size={16} />
+                        <div>
+                          <p className="text-[10px] font-black text-neutral-900 uppercase">Compliance</p>
+                          <div className="w-16 h-1.5 bg-neutral-100 rounded-full mt-1" />
+                        </div>
+                      </div>
+                      <div className="p-4 bg-white/50 rounded-2xl border border-neutral-100 flex items-center gap-3">
+                        <AlertTriangle className="text-amber-500" size={16} />
+                        <div>
+                          <p className="text-[10px] font-black text-neutral-900 uppercase">Financeiro</p>
+                          <div className="w-16 h-1.5 bg-neutral-100 rounded-full mt-1" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
               
-              <div className="grid grid-cols-2 gap-3 md:gap-4">
-                <div className="p-4 bg-neutral-50 rounded-[20px] text-center">
-                  <p className="text-[8px] md:text-[10px] font-black text-neutral-400 uppercase mb-2">Segurança</p>
-                  <p className="text-xl md:text-2xl font-headline font-black text-green-600">Alta</p>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-6 bg-neutral-50 rounded-[28px] border border-neutral-100/50 text-center group hover:bg-white hover:shadow-xl transition-all duration-500">
+                  <p className="text-[10px] font-black text-neutral-400 uppercase tracking-widest mb-3">Segurança Estimada</p>
+                  <p className="text-3xl font-headline font-black text-green-600 transition-transform group-hover:scale-110 tracking-tight">Alta</p>
                 </div>
-                <div className="p-4 bg-neutral-50 rounded-[20px] text-center">
-                  <p className="text-[8px] md:text-[10px] font-black text-neutral-400 uppercase mb-2">Retenção</p>
-                  <p className="text-xl md:text-2xl font-headline font-black text-[#1455CE]">85%</p>
+                <div className="p-6 bg-neutral-50 rounded-[28px] border border-neutral-100/50 text-center group hover:bg-white hover:shadow-xl transition-all duration-500">
+                  <p className="text-[10px] font-black text-neutral-400 uppercase tracking-widest mb-3">Projeção de Retenção</p>
+                  <p className="text-3xl font-headline font-black text-[#1455CE] transition-transform group-hover:scale-110 tracking-tight">85%</p>
                 </div>
               </div>
             </div>
@@ -431,7 +731,7 @@ export default function ContractDrawer({
               <p className="text-[8px] md:text-[10px] font-black text-neutral-400 uppercase tracking-[0.2em] mb-4 md:mb-6 ml-1">
                 Cláusulas Inteligentes
               </p>
-              <div className="space-y-2 md:space-y-3">
+              <div className="space-y-3 md:space-y-4">
                 {[
                   'Qualificação das Partes',
                   `Objeto ${isProposals ? "da Proposta" : "do Contrato"}`,
@@ -441,18 +741,39 @@ export default function ContractDrawer({
                   'Rescisão Antecipada',
                   'Foro e Eleição',
                 ].map((clausula, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center gap-3 md:gap-4 p-3 md:p-4 rounded-xl md:rounded-2xl hover:bg-neutral-50 border border-transparent hover:border-neutral-100 transition-all cursor-pointer group"
-                  >
-                    <div className="w-7 h-7 md:w-8 md:h-8 rounded-lg md:rounded-xl bg-[#1455CE]/10 flex items-center justify-center shrink-0 group-hover:bg-[#1455CE] transition-colors">
-                      <span className="text-[9px] md:text-[10px] font-black text-[#1455CE] group-hover:text-white">
-                        {String(i + 1).padStart(2, '0')}
+                  <div key={i} className="space-y-2">
+                    <div
+                      onClick={() => handleExplainClause(clausula, i)}
+                      className={`flex items-center gap-3 md:gap-4 p-3 md:p-4 rounded-xl md:rounded-2xl border transition-all cursor-pointer group ${
+                        clauseExplanation?.index === i 
+                          ? 'bg-[#1455CE]/5 border-[#1455CE]/20' 
+                          : 'hover:bg-neutral-50 border-transparent hover:border-neutral-100'
+                      }`}
+                    >
+                      <div className={`w-7 h-7 md:w-8 md:h-8 rounded-lg md:rounded-xl flex items-center justify-center shrink-0 transition-colors ${
+                        clauseExplanation?.index === i ? 'bg-[#1455CE] text-white' : 'bg-[#1455CE]/10 text-[#1455CE] group-hover:bg-[#1455CE] group-hover:text-white'
+                      }`}>
+                        <span className="text-[9px] md:text-[10px] font-black">
+                          {String(i + 1).padStart(2, '0')}
+                        </span>
+                      </div>
+                      <span className="text-xs md:text-sm text-neutral-700 font-bold group-hover:text-neutral-900 transition-colors flex-1">
+                        {clausula}
                       </span>
+                      {loadingClause && clauseExplanation?.index === i ? (
+                        <Loader2 className="animate-spin text-[#1455CE]" size={14} />
+                      ) : (
+                        <Bot size={14} className="text-neutral-200 group-hover:text-[#1455CE] transition-colors" />
+                      )}
                     </div>
-                    <span className="text-xs md:text-sm text-neutral-700 font-bold group-hover:text-neutral-900 transition-colors">
-                      {clausula}
-                    </span>
+                    
+                    {clauseExplanation && clauseExplanation.index === i && (
+                      <div className="mx-4 md:mx-6 p-4 bg-white border border-[#1455CE]/10 rounded-2xl shadow-sm animate-in zoom-in-95 duration-200">
+                        <p className="text-xs font-bold text-neutral-600 leading-relaxed italic">
+                          {clauseExplanation.text || 'Alfred está pensando...'}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -529,29 +850,7 @@ export default function ContractDrawer({
           )}
         </div>
 
-        {/* Barra de assinatura no rodapé (se assinado) */}
-        {contract.signed_at && (
-          <div className="p-5 md:p-8 border-t border-neutral-100 bg-green-50/70 shrink-0 no-print">
-            <div className="flex items-center gap-3 md:gap-4">
-              <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl bg-green-500/20 flex items-center justify-center shrink-0">
-                <Verified className="text-green-600 w-5 h-5 md:w-6 md:h-6" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs md:text-sm font-black text-neutral-900 tracking-tight leading-none mb-1 truncate">
-                   {contract.signed_by_name}
-                </p>
-                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[8px] md:text-[10px] font-bold text-green-700 uppercase tracking-widest opacity-80">
-                  <span className="whitespace-nowrap">Assinado em {formatDate(contract.signed_at)}</span>
-                  <span className="hidden xs:inline w-0.5 h-0.5 md:w-1 md:h-1 rounded-full bg-green-300" />
-                  <span className="whitespace-nowrap truncate">IP: {contract.signed_by_ip || '---'}</span>
-                </div>
-              </div>
-              <div className="px-2 py-0.5 md:px-3 md:py-1 bg-green-600 text-white text-[8px] md:text-[9px] font-black uppercase tracking-widest rounded-lg shrink-0">
-                Válido
-              </div>
-            </div>
-          </div>
-        )}
+        {/* Espaçador para o rodapé (opcional) */}
       </div>
     </>
   )

@@ -2,10 +2,13 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { TaxCalculationResult, TaxRegime } from '@/types/fiscal';
-import { Calculator, ChevronDown, CheckCircle2, AlertCircle, Info } from 'lucide-react';
+import { Calculator, ChevronDown, CheckCircle2, AlertCircle, Info, Save } from 'lucide-react';
+import { saveSimulationAction } from '@/app/actions/fiscalActions';
 
-export default function TaxCalculator() {
+export default function TaxCalculator({ userId }: { userId: string }) {
   const [loading, setLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
   const [revenue, setRevenue] = useState<string>('');
   const [annualRevenue, setAnnualRevenue] = useState<string>('');
   const [activity, setActivity] = useState<'Serviços' | 'Comércio+Indústria'>('Serviços');
@@ -62,13 +65,48 @@ export default function TaxCalculator() {
     window.dispatchEvent(new CustomEvent('alfred-fiscal-query', { detail: { question } }));
   };
 
+  const handleSaveSimulation = async () => {
+    if (!currentResult) return;
+    setIsSaving(true);
+    const now = new Date();
+    const result = await saveSimulationAction(userId, {
+      regime: activeRegime,
+      total: currentResult.total,
+      month: now.getMonth() + 1,
+      year: now.getFullYear()
+    });
+    
+    if (result.success) {
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
+    }
+    setIsSaving(false);
+  };
+
   return (
     <div className="bg-white p-4 md:p-6 rounded-2xl border border-[#E2E3E1] shadow-sm flex flex-col h-full overflow-hidden">
       <div className="flex items-center gap-3 mb-5 md:mb-6">
         <div className="w-9 h-9 md:w-10 md:h-10 rounded-lg md:rounded-xl bg-[#1455CE]/5 flex items-center justify-center">
           <Calculator className="w-4 h-4 md:w-5 md:h-5 text-[#1455CE]" />
         </div>
-        <h3 className="text-base md:text-lg font-black text-[#1A1C1B]">Comparativo Fiscal</h3>
+        <div className="flex-1">
+          <h3 className="text-base md:text-lg font-black text-[#1A1C1B]">Comparativo Fiscal</h3>
+          <p className="text-[10px] text-[#6B6D6B] font-bold uppercase tracking-widest leading-none mt-0.5">Estimativas e Simulações</p>
+        </div>
+        
+        {currentResult && (
+          <button 
+            onClick={handleSaveSimulation}
+            disabled={isSaving || saveSuccess}
+            className={`flex items-center gap-2 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+              saveSuccess 
+                ? 'bg-emerald-500 text-white' 
+                : 'bg-[#1455CE]/10 text-[#1455CE] hover:bg-[#1455CE] hover:text-white'
+            }`}
+          >
+            {isSaving ? 'Salvando...' : saveSuccess ? <><CheckCircle2 className="w-3.5 h-3.5"/> Salvo!</> : <><Save className="w-3.5 h-3.5"/> Salvar</>}
+          </button>
+        )}
       </div>
 
       {/* Inputs */}

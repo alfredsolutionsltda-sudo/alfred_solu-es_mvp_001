@@ -1,7 +1,7 @@
 'use client'
 
 import type { ContractMetrics } from '@/types/contracts'
-import { FileText, Clock, Calendar, DollarSign } from 'lucide-react'
+import { FileText, Clock, Calendar, DollarSign, TrendingUp } from 'lucide-react'
 
 interface ContractMetricsProps {
   metrics: ContractMetrics
@@ -35,11 +35,11 @@ export default function ContractMetrics({ metrics, mode = 'contracts' }: Contrac
       format: (v: number) => String(v),
     },
     {
-      key: 'vencendoEm30Dias' as const,
-      title: isProposals ? 'Expirando em 30 dias' : 'Vencendo em 30 dias',
-      icon: Calendar,
-      color: 'orange',
-      format: (v: number) => String(v),
+      key: (isProposals ? 'taxaConversao' : 'vencendoEm30Dias') as any,
+      title: isProposals ? 'Taxa de Conversão' : 'Vencendo em 30 dias',
+      icon: isProposals ? TrendingUp : Calendar,
+      color: isProposals ? 'blue' : 'orange',
+      format: (v: number) => isProposals ? `${v}%` : String(v),
     },
     {
       key: 'valorTotalAtivo' as const,
@@ -54,14 +54,15 @@ export default function ContractMetrics({ metrics, mode = 'contracts' }: Contrac
     green: { bg: 'bg-green-50', text: 'text-green-600', dot: 'bg-green-500' },
     amber: { bg: 'bg-amber-50', text: 'text-amber-600', dot: 'bg-amber-500' },
     orange: { bg: 'bg-orange-50', text: 'text-orange-600', dot: 'bg-orange-500' },
+    blue: { bg: 'bg-blue-50', text: 'text-blue-600', dot: 'bg-blue-500' },
     primary: { bg: 'bg-blue-50', text: 'text-[#1455CE]', dot: 'bg-[#1455CE]' },
   }
 
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
-      {cards.map((card) => {
+      {cards.map((card: any) => {
         const colors = colorMap[card.color]
-        const value = metrics[card.key]
+        const value = metrics[card.key as keyof typeof metrics] || 0
         const Icon = card.icon
 
         return (

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import RegisterPaymentModal from './RegisterPaymentModal';
 import { ObrigacaoFiscal } from '@/types/database';
 import { Calendar, CheckCircle2, AlertCircle, Clock, ChevronRight, FileText } from 'lucide-react';
 
@@ -11,9 +12,8 @@ interface ObrigacoesTableProps {
 
 export default function ObrigacoesTable({ obrigacoes }: ObrigacoesTableProps) {
   const router = useRouter();
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
-  const [loading, setLoading] = useState<string | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedObrigacao, setSelectedObrigacao] = useState<{ id: string, type: 'faturamento' | 'imposto', amount: number, date: string, name: string } | undefined>(undefined);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
@@ -42,26 +42,18 @@ export default function ObrigacoesTable({ obrigacoes }: ObrigacoesTableProps) {
   const months = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
 
   const totalPaid = obrigacoes.filter(o => o.status === 'pago').reduce((acc, curr) => acc + (curr.amount || 0), 0);
-  const totalPending = obrigacoes.filter(o => o.status === 'pendente' || o.status === 'atrasado').reduce((acc, curr) => acc + (curr.amount || 0), 0);
+  const totalPending = obrigacoes.filter(o => o.status === 'pendente' || o.status === 'atrasado' || (o.status !== 'pago' && o.status !== 'futuro')).reduce((acc, curr) => acc + (curr.amount || 0), 0);
   const totalRestante = obrigacoes.filter(o => o.status === 'futuro').reduce((acc, curr) => acc + (curr.amount || 0), 0);
 
-  const handlePay = async (id: string) => {
-    setLoading(id);
-    try {
-      const res = await fetch('/api/fiscal/mark-paid', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ obrigacaoId: id, paidAt: paymentDate })
-      });
-      if (res.ok) {
-        router.refresh();
-      }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setSelectedId(null);
-      setLoading(null);
-    }
+  const handleOpenPayment = (obr: ObrigacaoFiscal) => {
+    setSelectedObrigacao({
+      id: obr.id,
+      type: 'imposto',
+      amount: obr.amount || 0,
+      date: obr.due_date || new Date().toISOString().split('T')[0],
+      name: obr.name || ''
+    });
+    setIsModalOpen(true);
   };
 
   return (
@@ -127,7 +119,7 @@ export default function ObrigacoesTable({ obrigacoes }: ObrigacoesTableProps) {
                         <span className="text-[10px] text-[#98A2B3] font-bold uppercase px-2">Aguardando</span>
                       ) : (
                         <button 
-                          onClick={() => setSelectedId(obr.id)}
+                          onClick={() => handleOpenPayment(obr)}
                           className="flex items-center gap-1.5 min-h-[44px] px-4 py-2 text-[10px] font-black uppercase tracking-widest text-white bg-[#1455CE] rounded-xl hover:bg-[#1140A0] transition-all shadow-md shadow-[#1455CE]/10"
                         >
                           Pagar <ChevronRight className="w-3.5 h-3.5" />
@@ -207,7 +199,7 @@ export default function ObrigacoesTable({ obrigacoes }: ObrigacoesTableProps) {
                         <span className="text-xs text-[#98A2B3]">Aguardando</span>
                       ) : (
                         <button 
-                          onClick={() => setSelectedId(obr.id)}
+                          onClick={() => handleOpenPayment(obr)}
                           className="flex items-center gap-1.5 text-xs font-bold text-[#1455CE] bg-[#1455CE]/5 px-3 py-1.5 rounded-lg hover:bg-[#1455CE] hover:text-white transition-all min-h-[44px] md:min-h-0 min-w-[44px] md:min-w-0"
                         >
                           Pagar <ChevronRight className="w-3.5 h-3.5" />
@@ -230,43 +222,16 @@ export default function ObrigacoesTable({ obrigacoes }: ObrigacoesTableProps) {
         </div>
       </div>
 
-      {/* Modal Simples de Pagamento */}
-      {selectedId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl p-6 shadow-2xl w-full max-w-sm">
-            <h4 className="text-lg font-black text-[#1A1C1B] mb-2">Registrar Pagamento</h4>
-            <p className="text-sm text-[#6B6D6B] mb-4">Confirme a data que o pagamento foi realizado.</p>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-[#1A1C1B] uppercase tracking-wider mb-1.5">Data de Pagamento</label>
-                <input 
-                  type="date" 
-                  value={paymentDate}
-                  onChange={(e) => setPaymentDate(e.target.value)}
-                  className="w-full p-3 bg-[#F4F4F2] border-none rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#1455CE]/20"
-                />
-              </div>
-              
-              <div className="flex gap-2">
-                <button 
-                  onClick={() => setSelectedId(null)}
-                  className="flex-1 py-3 text-sm font-bold text-[#6B6D6B] hover:bg-[#F4F4F2] rounded-xl transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button 
-                  onClick={() => handlePay(selectedId)}
-                  disabled={loading === selectedId}
-                  className="flex-1 py-3 text-sm font-bold text-white bg-[#1455CE] rounded-xl shadow-[0_4px_12px_rgba(20,85,206,0.3)] hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50"
-                >
-                  {loading === selectedId ? 'Salvando...' : 'Confirmar'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Modal de Registro de Pagamento */}
+      <RegisterPaymentModal 
+        isOpen={isModalOpen}
+        onClose={() => {
+          setIsModalOpen(false);
+          setSelectedObrigacao(undefined);
+        }}
+        userId={obrigacoes[0]?.user_id || ''}
+        prefillData={selectedObrigacao}
+      />
     </div>
   );
 }

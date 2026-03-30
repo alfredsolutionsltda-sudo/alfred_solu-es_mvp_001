@@ -2,7 +2,8 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { CheckCircle, PenTool, Loader2 } from 'lucide-react'
+import { CheckCircle, PenTool, Loader2, XCircle, AlertCircle } from 'lucide-react'
+import { rejectProposalAction } from '@/app/actions/contractActions'
 
 interface SignatureFormProps {
   slug: string
@@ -21,6 +22,10 @@ export default function SignatureForm({ slug }: SignatureFormProps) {
     ip: string
   } | null>(null)
   const [error, setError] = useState('')
+  const [showRejectionInput, setShowRejectionInput] = useState(false)
+  const [rejectionReason, setRejectionReason] = useState('')
+  const [isRejecting, setIsRejecting] = useState(false)
+  const [rejected, setRejected] = useState(false)
 
   const formatCpf = (value: string) => {
     const digits = value.replace(/\D/g, '').slice(0, 11)
@@ -73,6 +78,40 @@ export default function SignatureForm({ slug }: SignatureFormProps) {
     } finally {
       setSigning(false)
     }
+  }
+  
+  const handleReject = async () => {
+    if (!rejectionReason.trim()) return
+    setIsRejecting(true)
+    setError('')
+    
+    try {
+      const res = await rejectProposalAction(slug, rejectionReason.trim())
+      if (res.success) {
+        setRejected(true)
+        setTimeout(() => router.refresh(), 1500)
+      } else {
+        setError(res.error || 'Erro ao recusar proposta')
+      }
+    } catch {
+      setError('Erro de conexão ao recusar proposta')
+    } finally {
+      setIsRejecting(false)
+    }
+  }
+
+  if (rejected) {
+    return (
+      <div className="p-12 border-t border-neutral-100 bg-red-50/20 no-print text-center flex flex-col items-center">
+        <div className="w-16 h-16 bg-red-100 rounded-[24px] flex items-center justify-center mb-6">
+          <XCircle className="text-red-500" size={32} />
+        </div>
+        <h3 className="text-xl font-headline font-black text-red-900 mb-2">Proposta Recusada</h3>
+        <p className="text-sm font-medium text-red-700/70 max-w-[300px]">
+          Sua recusa foi registrada com sucesso. O profissional será notificado.
+        </p>
+      </div>
+    )
   }
 
   if (signed && signedData) {
@@ -188,6 +227,46 @@ export default function SignatureForm({ slug }: SignatureFormProps) {
             </>
           )}
         </button>
+
+        {/* Opção de recusa */}
+        <div className="pt-2 text-center">
+          {!showRejectionInput ? (
+            <button
+              onClick={() => setShowRejectionInput(true)}
+              className="text-[10px] font-black text-neutral-400 hover:text-red-500 uppercase tracking-[0.2em] transition-colors"
+            >
+              Não aceito e gostaria de recusar
+            </button>
+          ) : (
+            <div className="bg-white p-6 rounded-[24px] border border-red-100 space-y-4 animate-in zoom-in-95 duration-300">
+              <div className="flex items-center gap-2 text-red-600 mb-2">
+                <AlertCircle size={14} className="stroke-[3px]" />
+                <span className="text-[10px] font-black uppercase tracking-widest">Diga ao Alfred o motivo da recusa</span>
+              </div>
+              <textarea
+                value={rejectionReason}
+                onChange={(e) => setRejectionReason(e.target.value)}
+                placeholder="Ex: O valor está acima do mercado / O prazo não me atende..."
+                className="w-full px-5 py-4 rounded-2xl border border-neutral-100 text-sm font-medium focus:outline-none focus:ring-4 focus:ring-red-500/5 focus:border-red-200 transition-all bg-neutral-50/50 min-h-[100px] resize-none"
+              />
+              <div className="flex gap-3 mt-4">
+                <button
+                  onClick={() => setShowRejectionInput(false)}
+                  className="flex-1 py-3.5 rounded-xl text-[10px] font-black uppercase tracking-widest text-neutral-400 hover:bg-neutral-50 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleReject}
+                  disabled={!rejectionReason.trim() || isRejecting}
+                  className="flex-[2] py-3.5 rounded-xl text-[10px] bg-red-500 text-white font-black uppercase tracking-widest hover:bg-red-600 transition-all disabled:opacity-30 shadow-lg shadow-red-500/10 flex items-center justify-center gap-2"
+                >
+                  {isRejecting ? <Loader2 className="animate-spin" size={14} /> : 'Confirmar Recusa'}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )

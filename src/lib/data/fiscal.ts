@@ -16,8 +16,7 @@ export async function getObrigacoes(userId: string, year: number): Promise<Obrig
 
   if (error) throw error;
 
-  // 2. Se não existirem, retorna vazio (Não gerar mais dados fakes)
-  /*
+  // 2. Se não existirem, gera automaticamente para o primeiro acesso
   if (!data || data.length === 0) {
     const { data: profile } = await supabase
       .from('profiles')
@@ -25,13 +24,19 @@ export async function getObrigacoes(userId: string, year: number): Promise<Obrig
       .eq('id', userId)
       .single();
 
-    if (profile && profile.tax_regime) {
-      await generateObrigacoesForYear(userId, profile.tax_regime as TaxRegime, year, profile.average_ticket || 0);
+    if (profile && profile.tax_regime && profile.tax_regime !== 'Não definido') {
+      // Gera obrigações para o ano atual baseadas no faturamento médio
+      await generateObrigacoesForYear(
+        userId, 
+        profile.tax_regime as TaxRegime, 
+        year, 
+        profile.average_ticket || 5000 // Fallback se não tiver ticket médio
+      );
       
       // Busca novamente após gerar
       const { data: freshData } = await supabase
         .from('obrigacoes_fiscais')
-        .select('*')
+        .select('id, user_id, client_id, name, description, amount, due_date, status, completed_at, paid_at, year, type, recorrente, recorrencia, created_at, updated_at')
         .eq('user_id', userId)
         .eq('year', year)
         .order('due_date', { ascending: true });
@@ -39,7 +44,7 @@ export async function getObrigacoes(userId: string, year: number): Promise<Obrig
       return freshData || [];
     }
   }
-  */
+
   return data || [];
 }
 

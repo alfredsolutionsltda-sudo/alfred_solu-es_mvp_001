@@ -1,24 +1,49 @@
 'use client';
 
-import { useState } from "react";
-import { X, DollarSign, Calendar, Tag, FileText, CheckCircle2 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { X, DollarSign, Calendar, Tag, FileText, CheckCircle2, Upload } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { registerPaymentAction } from "@/app/actions/fiscalActions";
+import { registerPaymentAction, markObrigacaoAsPaidAction } from "@/app/actions/fiscalActions";
 
-export default function RegisterPaymentModal({ isOpen, onClose, userId }: { isOpen: boolean, onClose: () => void, userId: string }) {
+export default function RegisterPaymentModal({ 
+  isOpen, 
+  onClose, 
+  userId,
+  prefillData 
+}: { 
+  isOpen: boolean, 
+  onClose: () => void, 
+  userId: string,
+  prefillData?: { id?: string, type: 'faturamento' | 'imposto', amount: number, date: string, name: string }
+}) {
   const router = useRouter();
   const [formData, setFormData] = useState({
-    type: 'faturamento', // faturamento | imposto
-    amount: '',
-    date: new Date().toISOString().split('T')[0],
-    category: 'honorario_fixo',
+    type: prefillData?.type || 'faturamento',
+    amount: prefillData?.amount?.toString() || '',
+    date: prefillData?.date || new Date().toISOString().split('T')[0],
+    category: prefillData?.type === 'imposto' ? 'SIMPLES' : 'honorario_fixo',
     status: 'pago',
-    description: ''
+    description: prefillData?.name || ''
   });
   
+  const [file, setFile] = useState<File | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+
+  // Sincroniza form quando prefillData muda
+  useEffect(() => {
+    if (prefillData) {
+      setFormData({
+        type: prefillData.type,
+        amount: prefillData.amount.toString(),
+        date: prefillData.date,
+        category: prefillData.type === 'imposto' ? 'SIMPLES' : 'honorario_fixo',
+        status: 'pago',
+        description: prefillData.name
+      });
+    }
+  }, [prefillData]);
 
   if (!isOpen) return null;
 
@@ -32,10 +57,17 @@ export default function RegisterPaymentModal({ isOpen, onClose, userId }: { isOp
     setIsLoading(true);
     setError(null);
 
-    const result = await registerPaymentAction(userId, {
-      ...formData,
-      amount: Number(formData.amount)
-    });
+    let result;
+    if (prefillData?.id && prefillData.type === 'imposto') {
+      // Se estamos pagando uma obrigação específica
+      result = await markObrigacaoAsPaidAction(userId, prefillData.id, formData.date);
+    } else {
+      // Registro genérico
+      result = await registerPaymentAction(userId, {
+        ...formData,
+        amount: Number(formData.amount)
+      });
+    }
 
     if (result.success) {
       setSuccess(true);
@@ -188,6 +220,34 @@ export default function RegisterPaymentModal({ isOpen, onClose, userId }: { isOp
                     value={formData.description}
                     onChange={e => setFormData({...formData, description: e.target.value})}
                   />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-[#1A1C1B] uppercase tracking-wider">Comprovante de Pagamento</label>
+                <div 
+                  className={`border-2 border-dashed rounded-2xl p-6 transition-all flex flex-col items-center justify-center gap-2 cursor-pointer ${file ? 'border-[#1455CE] bg-[#1455CE]/5' : 'border-[#E2E3E1] hover:border-[#1455CE]/50'}`}
+                  onClick={() => document.getElementById('file-upload')?.click()}
+                >
+                  <input 
+                    id="file-upload"
+                    type="file"
+                    className="hidden"
+                    onChange={(e) => setFile(e.target.files?.[0] || null)}
+                  />
+                  {file ? (
+                    <>
+                      <CheckCircle2 className="w-8 h-8 text-[#1455CE]" />
+                      <span className="text-xs font-bold text-[#1A1C1B]">{file.name}</span>
+                      <button onClick={(e) => { e.stopPropagation(); setFile(null); }} className="text-[10px] text-red-500 font-bold uppercase hover:underline">Remover</button>
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="w-8 h-8 text-[#6B6D6B]" />
+                      <span className="text-xs font-bold text-[#6B6D6B]">Arraste ou clique para enviar</span>
+                      <span className="text-[10px] text-[#98A2B3] uppercase font-bold tracking-widest">(PDF, JPG, PNG)</span>
+                    </>
+                  )}
                 </div>
               </div>
 
