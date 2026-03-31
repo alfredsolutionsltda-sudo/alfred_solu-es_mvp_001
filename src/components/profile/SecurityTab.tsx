@@ -83,7 +83,7 @@ export default function SecurityTab({ profile }: SecurityTabProps) {
   return (
     <div className="space-y-8 pb-16">
       {/* Alterar Senha */}
-      <div className="bg-white rounded-[24px] p-8 shadow-[0_4px_20px_rgba(0,0,0,0.03)] space-y-8 border border-neutral-100">
+      <div className="bg-white rounded-[24px] p-6 lg:p-8 shadow-[0_4px_20px_rgba(0,0,0,0.03)] space-y-8 border border-neutral-100">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <Lock className="text-[#1455CE]" size={20} />
@@ -121,7 +121,7 @@ export default function SecurityTab({ profile }: SecurityTabProps) {
           <button 
             type="submit"
             disabled={loading}
-            className="px-8 py-3.5 bg-[#1455CE] text-white rounded-xl font-bold hover:bg-[#114ab3] transition-all shadow-lg shadow-[#1455CE]/20 disabled:opacity-50"
+            className="w-full sm:w-auto px-8 py-3.5 bg-[#1455CE] text-white rounded-xl font-bold hover:bg-[#114ab3] transition-all shadow-lg shadow-[#1455CE]/20 disabled:opacity-50"
           >
             {loading ? 'Atualizando...' : 'Atualizar Senha'}
           </button>
@@ -129,15 +129,15 @@ export default function SecurityTab({ profile }: SecurityTabProps) {
       </div>
 
       {/* Sessões e Segurança Extra */}
-      <div className="bg-white rounded-[24px] p-8 shadow-[0_4px_20px_rgba(0,0,0,0.03)] space-y-6 border border-neutral-100">
+      <div className="bg-white rounded-[24px] p-6 lg:p-8 shadow-[0_4px_20px_rgba(0,0,0,0.03)] space-y-6 border border-neutral-100">
         <div className="space-y-1">
           <h3 className="text-xl font-headline font-black text-neutral-900 tracking-tight">Privacidade e Dados</h3>
           <p className="text-sm font-medium text-neutral-500">Suas sessões ativas e controle de conta.</p>
         </div>
 
-        <div className="flex items-center justify-between p-6 bg-neutral-50 rounded-2xl">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 lg:p-6 bg-neutral-50 rounded-2xl">
           <div className="flex items-center gap-4">
-            <div className="w-10 h-10 bg-green-50 text-green-600 rounded-xl flex items-center justify-center">
+            <div className="w-10 h-10 bg-green-50 text-green-600 rounded-xl flex items-center justify-center shrink-0">
               <Monitor size={20} />
             </div>
             <div>
@@ -147,7 +147,7 @@ export default function SecurityTab({ profile }: SecurityTabProps) {
           </div>
           <button 
             onClick={() => supabase.auth.signOut({ scope: 'global' })}
-            className="text-xs font-bold text-neutral-400 hover:text-[#1455CE] transition-colors hover:underline"
+            className="text-xs font-bold text-neutral-400 hover:text-[#1455CE] transition-colors hover:underline text-left sm:text-right"
           >
             Sair de todos os dispositivos
           </button>
@@ -164,7 +164,7 @@ export default function SecurityTab({ profile }: SecurityTabProps) {
             </div>
             <button 
               onClick={() => setShowDeleteModal(true)}
-              className="px-6 py-3 border-2 border-red-100 text-red-600 rounded-xl text-xs font-black hover:bg-red-600 hover:text-white transition-all whitespace-nowrap"
+              className="w-full md:w-auto px-6 py-3 border-2 border-red-100 text-red-600 rounded-xl text-xs font-black hover:bg-red-600 hover:text-white transition-all whitespace-nowrap"
             >
               Excluir minha conta
             </button>

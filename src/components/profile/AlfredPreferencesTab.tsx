@@ -71,7 +71,7 @@ export default function AlfredPreferencesTab({ profile }: AlfredPreferencesTabPr
 
   return (
     <div className="space-y-8">
-      <div className="bg-white rounded-[24px] p-8 shadow-[0_4px_20px_rgba(0,0,0,0.03)] space-y-8 border border-neutral-100">
+      <div className="bg-white rounded-[24px] p-6 lg:p-8 shadow-[0_4px_20px_rgba(0,0,0,0.03)] space-y-8 border border-neutral-100">
         <div className="space-y-1">
           <h3 className="text-xl font-headline font-black text-neutral-900 tracking-tight">Preferências do Alfred</h3>
           <p className="text-sm font-medium text-neutral-500">Como o Alfred deve agir em seu nome.</p>
@@ -121,8 +121,8 @@ export default function AlfredPreferencesTab({ profile }: AlfredPreferencesTabPr
             </div>
           </div>
 
-          <div className="flex items-center justify-between pt-6 border-t border-neutral-100 text-right">
-            <p className="text-xs font-bold text-neutral-400">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 pt-6 border-t border-neutral-100">
+            <p className="text-xs font-bold text-neutral-400 text-left">
               {success ? (
                 <span className="text-green-600 flex items-center gap-1">
                   <CheckCircle size={14} />
@@ -135,7 +135,7 @@ export default function AlfredPreferencesTab({ profile }: AlfredPreferencesTabPr
             <button 
               type="submit"
               disabled={loading || regenerating}
-              className="px-8 py-3.5 bg-[#1455CE] text-white rounded-xl font-bold hover:bg-[#114ab3] transition-all shadow-lg shadow-[#1455CE]/20 disabled:opacity-50"
+              className="w-full sm:w-auto px-8 py-3.5 bg-[#1455CE] text-white rounded-xl font-bold hover:bg-[#114ab3] transition-all shadow-lg shadow-[#1455CE]/20 disabled:opacity-50"
             >
               Salvar Preferências
             </button>
@@ -144,7 +144,7 @@ export default function AlfredPreferencesTab({ profile }: AlfredPreferencesTabPr
       </div>
 
       {/* Card de Contexto do Alfred */}
-      <div className="bg-white rounded-[24px] p-8 shadow-[0_4px_20px_rgba(0,0,0,0.03)] space-y-6 border border-neutral-100">
+      <div className="bg-white rounded-[24px] p-6 lg:p-8 shadow-[0_4px_20px_rgba(0,0,0,0.03)] space-y-6 border border-neutral-100">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
@@ -157,7 +157,7 @@ export default function AlfredPreferencesTab({ profile }: AlfredPreferencesTabPr
           <button 
             onClick={() => setShowRegenModal(true)}
             disabled={regenerating}
-            className="flex items-center gap-2 px-6 py-3 bg-[#1455CE]/10 text-[#1455CE] rounded-xl text-xs font-bold hover:bg-[#1455CE]/20 transition-all disabled:opacity-50"
+            className="w-full md:w-auto flex items-center justify-center gap-2 px-6 py-3 bg-[#1455CE]/10 text-[#1455CE] rounded-xl text-xs font-bold hover:bg-[#1455CE]/20 transition-all disabled:opacity-50"
           >
             {regenerating ? (
               <span className="flex items-center gap-2">
@@ -183,8 +183,8 @@ export default function AlfredPreferencesTab({ profile }: AlfredPreferencesTabPr
           <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-neutral-50/50 pointer-events-none rounded-2xl" />
         </div>
 
-        <div className="pt-4 flex justify-between items-center">
-          <p className="text-[10px] font-black text-neutral-400 uppercase tracking-widest max-w-[200px]">
+        <div className="pt-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+          <p className="text-[10px] font-black text-neutral-400 uppercase tracking-widest max-w-[200px] text-center sm:text-left">
              Não é possível editar este texto manualmente para manter a coerência da IA.
           </p>
           <button 

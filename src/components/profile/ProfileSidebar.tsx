@@ -51,7 +51,7 @@ export default function ProfileSidebar({ profile }: ProfileSidebarProps) {
   return (
     <div className="space-y-6">
       {/* Card de Identidade */}
-      <div className="bg-white rounded-[24px] p-8 shadow-[0_4px_20px_rgba(0,0,0,0.03)] text-center space-y-6 border border-neutral-100">
+      <div className="bg-white rounded-[24px] p-6 lg:p-8 shadow-[0_4px_20px_rgba(0,0,0,0.03)] text-center space-y-6 border border-neutral-100">
         <div className="flex flex-col items-center gap-4">
           <div className={`w-24 h-24 rounded-3xl ${avatarColor} flex items-center justify-center border-4 border-white shadow-lg text-white text-3xl font-black font-headline`}>
             {initials}
@@ -89,7 +89,7 @@ export default function ProfileSidebar({ profile }: ProfileSidebarProps) {
       </div>
 
       {/* Card de Plano */}
-      <div className="bg-white rounded-[24px] p-8 shadow-[0_4px_20px_rgba(0,0,0,0.03)] space-y-6 border border-[#1455CE]/10">
+      <div className="bg-white rounded-[24px] p-6 lg:p-8 shadow-[0_4px_20px_rgba(0,0,0,0.03)] space-y-6 border border-[#1455CE]/10">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 rounded-2xl bg-[#1455CE]/10 flex items-center justify-center">
             <Award className="text-[#1455CE]" size={24} />

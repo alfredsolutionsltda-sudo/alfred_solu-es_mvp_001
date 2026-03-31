@@ -65,7 +65,7 @@ export default function BusinessTab({ profile }: BusinessTabProps) {
   }
 
   return (
-    <div className="bg-white rounded-[24px] p-8 shadow-[0_4px_20px_rgba(0,0,0,0.03)] space-y-8 border border-neutral-100">
+    <div className="bg-white rounded-[24px] p-6 lg:p-8 shadow-[0_4px_20px_rgba(0,0,0,0.03)] space-y-8 border border-neutral-100">
       <div className="space-y-1">
         <h3 className="text-xl font-headline font-black text-neutral-900 tracking-tight">Meu Negócio</h3>
         <p className="text-sm font-medium text-neutral-500">Configure seu posicionamento e dados profissionais.</p>
@@ -174,8 +174,8 @@ export default function BusinessTab({ profile }: BusinessTabProps) {
           </div>
         </div>
 
-        <div className="flex items-center justify-between pt-6 border-t border-neutral-100 text-right">
-          <p className="hidden md:block text-xs font-bold text-neutral-400 text-left max-w-xs">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 pt-6 border-t border-neutral-100">
+          <p className="text-xs font-bold text-neutral-400 text-left max-w-xs">
             {success ? (
               <span className="text-green-600 flex items-center gap-1 animate-in slide-in-from-left-2">
                 <CheckCircle size={14} />
@@ -188,7 +188,7 @@ export default function BusinessTab({ profile }: BusinessTabProps) {
           <button 
             type="submit"
             disabled={loading}
-            className="px-8 py-3.5 bg-[#1455CE] text-white rounded-xl font-bold hover:bg-[#114ab3] transition-all shadow-lg shadow-[#1455CE]/20 disabled:opacity-50 flex items-center gap-2"
+            className="w-full sm:w-auto px-8 py-3.5 bg-[#1455CE] text-white rounded-xl font-bold hover:bg-[#114ab3] transition-all shadow-lg shadow-[#1455CE]/20 disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {loading && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
             Salvar Dados do Negócio
