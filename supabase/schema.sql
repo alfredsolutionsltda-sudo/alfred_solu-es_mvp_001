@@ -237,3 +237,24 @@ create or replace trigger faturamento_updated_at before update on public.faturam
   for each row execute procedure public.handle_updated_at();
 create or replace trigger obrigacoes_fiscais_updated_at before update on public.obrigacoes_fiscais
   for each row execute procedure public.handle_updated_at();
+
+-- ─────────────────────────────────────────
+-- TABELA: audit_logs
+-- ─────────────────────────────────────────
+create table if not exists public.audit_logs (
+  id uuid default uuid_generate_v4() primary key,
+  user_id uuid references public.profiles(id) on delete cascade,
+  action text not null,
+  resource text not null,
+  resource_id text,
+  metadata jsonb default '{}'::jsonb,
+  ip_address text,
+  user_agent text,
+  created_at timestamptz default now() not null
+);
+
+alter table public.audit_logs enable row level security;
+
+create policy "Acesso restrito a audit logs" on public.audit_logs
+  for select using (false);
+
