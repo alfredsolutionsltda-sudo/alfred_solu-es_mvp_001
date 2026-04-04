@@ -14,6 +14,7 @@ const nextConfig: NextConfig = {
   images: {
     formats: ['image/avif', 'image/webp'],
     minimumCacheTTL: 31536000, // 1 ano
+    unoptimized: true,
   },
   
   // Headers de cache para assets estáticos e segurança
