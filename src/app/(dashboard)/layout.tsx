@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import TopNav from '@/components/TopNav'
 import BottomNav from '@/components/BottomNav'
 import ScoreUpdater from '@/components/clients/ScoreUpdater'
+import InactivityWrapper from '@/components/InactivityWrapper'
 
 export default async function DashboardLayout({
   children,
@@ -28,6 +29,7 @@ export default async function DashboardLayout({
 
   return (
     <div className="min-h-screen bg-surface flex flex-col">
+      <InactivityWrapper />
       <ScoreUpdater />
       <TopNav
         userEmail={user.email}

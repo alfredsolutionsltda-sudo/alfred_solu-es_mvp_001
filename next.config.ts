@@ -56,9 +56,9 @@ const nextConfig: NextConfig = {
     optimizeCss: true,
   },
   
-  // Remover console.log em produção
+  // Remover console.log em produção, exceto avisos e erros
   compiler: {
-    removeConsole: process.env.NODE_ENV === 'production',
+    removeConsole: process.env.NODE_ENV === 'production' ? { exclude: ['error', 'warn'] } : false,
   },
 };
 

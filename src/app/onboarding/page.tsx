@@ -42,12 +42,44 @@ export default function OnboardingPage() {
         return;
       }
 
-      setMessages([
-        { 
-          role: 'assistant', 
-          content: "Olá! Eu sou o Alfred, seu novo Chief of Staff digital. Para começarmos, como você prefere ser chamado?" 
-        }
-      ]);
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', session.user.id)
+        .single()
+
+      const startBlock = profile?.preferred_name ? 
+        (profile?.profession ? 
+          (profile?.tax_regime ? 
+            (profile?.services ? 5 : 4) 
+          : 3) 
+        : 2) 
+      : 1;
+
+      setCurrentBlock(startBlock);
+      
+      if (startBlock > 1) {
+         setMessages([
+          { 
+            role: 'assistant', 
+            content: `Bem-vindo de volta, ${profile?.preferred_name || ''}! Vamos retomar de onde paramos.` 
+          }
+         ]);
+         
+         const localData = sessionStorage.getItem('alfred_onboarding');
+         if (localData) {
+            setOnboardingData(JSON.parse(localData));
+         } else {
+            setOnboardingData(profile);
+         }
+      } else {
+         setMessages([
+          { 
+            role: 'assistant', 
+            content: "Olá! Eu sou o Alfred, seu novo Chief of Staff digital. Para começarmos, como você prefere ser chamado?" 
+          }
+        ]);
+      }
       setInitialized(true);
     };
 
@@ -109,8 +141,9 @@ O alfred_context gerado deve ter entre 300 e 500 palavras.
 Dados coletados:
 ${JSON.stringify(finalData, null, 2)}`;
     try {
-      console.log('Iniciando geração de contexto para o usuário:', session.user.id);
-      console.log('Dados finais coletados:', JSON.stringify(finalData, null, 2));
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Dados finais coletados:', JSON.stringify(finalData, null, 2));
+      }
 
       const response = await fetch('/api/ai', {
         method: 'POST',
@@ -122,11 +155,12 @@ ${JSON.stringify(finalData, null, 2)}`;
         })
       });
 
-      console.log('Resposta da API /api/ai status:', response.status);
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Resposta da API /api/ai status:', response.status);
+      }
 
       if (response.ok) {
         const data = await response.json();
-        console.log('JSON da resposta recebido com sucesso.');
         const alfredContext = data.choices[0].message.content;
 
         // Limpeza de dados — Garantindo tipos corretos para o Supabase
@@ -151,7 +185,6 @@ ${JSON.stringify(finalData, null, 2)}`;
               : null
         };
 
-        console.log('Atualizando perfil no Supabase com dados sanitizados:', sanitizedData);
         const { error } = await supabase
           .from('profiles')
           .update({
@@ -180,7 +213,6 @@ ${JSON.stringify(finalData, null, 2)}`;
            throw error;
         }
         
-        console.log('Perfil atualizado com sucesso no Supabase!');
         return true;
       } else {
         const errText = await response.text();
@@ -220,6 +252,9 @@ ${JSON.stringify(finalData, null, 2)}`;
         if (extractionResult.isCurrentBlockComplete && currentBlock < 6) {
           newBlock = currentBlock + 1;
           setCurrentBlock(newBlock);
+          
+          await supabase.from('profiles').update(extractionResult.data).eq('id', session.user.id);
+          sessionStorage.setItem('alfred_onboarding', JSON.stringify(updatedData));
         }
       }
 

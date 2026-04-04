@@ -241,39 +241,33 @@ export async function getProposalFunnel(userId: string, period: ReportPeriod): P
   const supabase = await createClient();
   const { start, end } = await getPeriodDates(period);
 
-  // Propostas enviadas no período
-  const { data: proposals } = await supabase
-    .from('proposals')
-    .select('status')
+  const { data: contracts } = await supabase
+    .from('contracts')
+    .select('status, id')
     .eq('user_id', userId)
     .gte('created_at', start)
-    .lte('created_at', end);
+    .lte('created_at', end)
+    .in('status', ['pendente_assinatura', 'ativo', 'expirado']);
 
-  // Propostas pagas (convertidas em faturamento)
-  // Nota: Consideramos propostas que viraram contratos e geraram faturamento pago
-  // Ou simplesmente propostas com status 'aprovada' que têm faturamento vinculado?
-  // User Prompt: "Propostas enviadas → aceitas → pagas (contratos com faturamento)"
-  const sent = proposals?.length || 0;
-  const accepted = proposals?.filter(p => ['aprovada', 'aceita'].includes(p.status)).length || 0;
+  const sent = contracts?.length || 0;
+  const accepted = contracts?.filter(p => p.status === 'ativo').length || 0;
   
-  // Para 'pagas', buscamos faturamento pago vinculado a contratos criados no período
-  // Mas simplificando para o MVP: propostas aceitas que já têm faturamento pago?
-  // Vamos buscar contratos criados no período vinculados a propostas
   const { data: contractsWithPayment } = await supabase
     .from('faturamento')
-    .select('id')
+    .select('contract_id')
     .eq('user_id', userId)
     .eq('status', 'pago')
     .gte('created_at', start)
     .lte('created_at', end)
     .not('contract_id', 'is', null);
 
-  const paid = contractsWithPayment?.length || 0;
+  const paidContracts = new Set((contractsWithPayment || []).map(f => f.contract_id));
+  const paid = contracts?.filter(c => paidContracts.has(c.id)).length || 0;
 
   return {
     sent,
     accepted,
-    paid: Math.min(paid, accepted), // paid não pode ser maior que aceitas no funil visualmente
+    paid: Math.min(paid, accepted),
     conversionRates: {
       sentToAccepted: sent > 0 ? (accepted / sent) * 100 : 0,
       acceptedToPaid: accepted > 0 ? (paid / accepted) * 100 : 0
@@ -285,38 +279,28 @@ export async function getConversionByService(userId: string, period: ReportPerio
   const supabase = await createClient();
   const { start, end } = await getPeriodDates(period);
 
-  // NOTA: Como não temos type em proposals no schema.sql, vamos assumir que extraímos do title 
-  // ou que o usuário quer por service_type (que talvez esteja em profiles ou contracts)
-  // No prompt: "Agrupa propostas por service_type".
-  // Vamos buscar todas as propostas
   const { data } = await supabase
-    .from('proposals')
-    .select('status, title')
+    .from('contracts')
+    .select('service_type, status')
     .eq('user_id', userId)
     .gte('created_at', start)
     .lte('created_at', end);
 
-  // Mock grouping logic since service_type is not in DB yet
-  // In a real scenario, we'd have a service_type column
-  const groups: any = {
-    'Consultoria': { proposals: 0, accepted: 0 },
-    'Compliance': { proposals: 0, accepted: 0 },
-    'Recuperação': { proposals: 0, accepted: 0 },
-    'Assessoria': { proposals: 0, accepted: 0 },
-  };
+  if (!data || data.length === 0) return [];
 
-  (data || []).forEach(p => {
-    // Randomly assign to a group for demo if not found in title
-    const type = Object.keys(groups).find(t => p.title.includes(t)) || 'Assessoria';
-    groups[type].proposals += 1;
-    if (['aprovada', 'aceita'].includes(p.status)) groups[type].accepted += 1;
-  });
+  const grouped = data.reduce((acc, contract) => {
+    const type = contract.service_type || 'Outros';
+    if (!acc[type]) acc[type] = { total: 0, ativos: 0 };
+    acc[type].total++;
+    if (contract.status === 'ativo') acc[type].ativos++;
+    return acc;
+  }, {} as Record<string, { total: number; ativos: number; }>);
 
-  return Object.entries(groups).map(([type, stats]: [string, any]) => ({
+  return Object.entries(grouped).map(([type, stats]) => ({
     serviceType: type,
-    proposals: stats.proposals,
-    accepted: stats.accepted,
-    conversionRate: stats.proposals > 0 ? (stats.accepted / stats.proposals) * 100 : 0
+    proposals: stats.total,
+    accepted: stats.ativos,
+    conversionRate: stats.total > 0 ? (stats.ativos / stats.total) * 100 : 0
   })).sort((a, b) => b.conversionRate - a.conversionRate);
 }
 

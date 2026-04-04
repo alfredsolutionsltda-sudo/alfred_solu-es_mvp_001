@@ -34,10 +34,10 @@ export async function getBriefingData(userId: string) {
 
   // 3. Propostas sem resposta há mais de 7 dias
   const { data: propostasSemResposta } = await supabase
-    .from('proposals')
+    .from('contracts')
     .select('title, created_at, clients(name)')
     .eq('user_id', userId)
-    .eq('status', 'enviada')
+    .eq('status', 'pendente_assinatura')
     .lte('created_at', ago7Days.toISOString())
 
   // 4. DAS ou obrigação fiscal vencendo em até 7 dias

@@ -55,37 +55,42 @@ export async function middleware(request: NextRequest) {
   )
 
   const { data: { user } } = await supabase.auth.getUser()
+  const path = request.nextUrl.pathname
 
-  // Se o usuário não está logado e tenta acessar rotas privadas
-  if (!user && (
-    request.nextUrl.pathname.startsWith('/dashboard') || 
-    request.nextUrl.pathname.startsWith('/onboarding') ||
-    request.nextUrl.pathname.startsWith('/perfil')
-  )) {
+  // Definir rotas públicas
+  const publicRoutes = ['/login', '/cadastro', '/auth/callback']
+  const isPublicRoute = publicRoutes.some(route => path.startsWith(route)) ||
+                        path.startsWith('/contrato/') ||
+                        path.startsWith('/proposta/') ||
+                        path.startsWith('/api/proposals/')
+
+  // Sem sessão -> redirect para /login se não for rota pública
+  if (!user && !isPublicRoute) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  // Se o usuário está logado
+  // Com sessão
   if (user) {
-    // Busca o status de onboarding
     const { data: profile } = await supabase
       .from('profiles')
       .select('onboarding_completed')
       .eq('id', user.id)
       .single()
 
-    // Se já terminou onboarding e tenta acessar a página de onboarding
-    if (profile?.onboarding_completed && request.nextUrl.pathname.startsWith('/onboarding')) {
+    const hasOnboarding = profile?.onboarding_completed
+
+    // Se está em rota de login/cadastro, manda pro dashboard
+    if (path.startsWith('/login') || path.startsWith('/cadastro')) {
       return NextResponse.redirect(new URL('/dashboard', request.url))
     }
 
-    // Se NÃO terminou onboarding e tenta acessar o dashboard
-    if (!profile?.onboarding_completed && request.nextUrl.pathname.startsWith('/dashboard')) {
+    // Com sessão mas sem onboarding -> redirect para /onboarding
+    if (!hasOnboarding && !path.startsWith('/onboarding') && !isPublicRoute) {
       return NextResponse.redirect(new URL('/onboarding', request.url))
     }
 
-    // Se está logado e tenta acessar login/cadastro
-    if (request.nextUrl.pathname.startsWith('/login') || request.nextUrl.pathname.startsWith('/cadastro')) {
+    // Com onboarding completo tentando acessar /onboarding -> redirect para /dashboard
+    if (hasOnboarding && path.startsWith('/onboarding')) {
       return NextResponse.redirect(new URL('/dashboard', request.url))
     }
   }
@@ -94,15 +99,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - public (public assets)
-     * - api (API routes - these should handle their own auth or be public)
-     */
-    '/((?!_next/static|_next/image|favicon.ico|public|api).*)',
-  ],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
 }
