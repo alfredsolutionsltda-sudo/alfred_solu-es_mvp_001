@@ -2,8 +2,15 @@ import { NextResponse } from 'next/server'
 import { headers } from 'next/headers'
 import { signContract, getContractBySlug } from '@/lib/data/contracts'
 import { sendContractSignedEmail } from '@/lib/email/resend'
+import { validateOrigin } from '@/lib/csrf'
+import { checkRateLimit, rateLimitResponse, LIMITS } from '@/lib/api/rate-limit'
+import { logger } from '@/lib/logger'
 
 export async function POST(request: Request) {
+  if (!validateOrigin(request)) {
+    return new Response(JSON.stringify({ error: 'Origem não permitida' }), { status: 403, headers: { 'Content-Type': 'application/json' } })
+  }
+
   try {
     const { slug, name, document } = await request.json()
 
@@ -62,8 +69,13 @@ export async function POST(request: Request) {
     })
   } catch (error: unknown) {
     const message =
-      error instanceof Error ? error.message : 'Erro interno do servidor'
+      error instanceof Error ? 'Erro interno. Tente novamente.' : 'Erro interno do servidor'
     console.error('Erro na assinatura de contrato:', error)
     return NextResponse.json({ error: message }, { status: 500 })
   }
+}
+
+
+export async function OPTIONS() {
+  return new Response(null, { status: 204 })
 }

@@ -1,7 +1,15 @@
+import { validateOrigin } from '@/lib/csrf'
+import { checkRateLimit, rateLimitResponse, LIMITS } from '@/lib/api/rate-limit'
+import { sanitizeText } from '@/lib/sanitize'
+import { logger } from '@/lib/logger'
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 
 export async function POST(request: Request) {
+  if (!validateOrigin(request)) {
+    return new Response(JSON.stringify({ error: 'Origem não permitida' }), { status: 403, headers: { 'Content-Type': 'application/json' } })
+  }
+
   try {
     const body = await request.json();
     const { messages, systemPrompt, userId } = body;
@@ -67,4 +75,9 @@ export async function POST(request: Request) {
     console.error('Unexpected error in AI route:', error);
     return NextResponse.json({ error: error?.message || 'Internal Server Error' }, { status: 500 });
   }
+}
+
+
+export async function OPTIONS() {
+  return new Response(null, { status: 204 })
 }

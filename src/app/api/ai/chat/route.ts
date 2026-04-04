@@ -1,8 +1,11 @@
+import { validateOrigin } from '@/lib/csrf'
+import { checkRateLimit, rateLimitResponse, LIMITS } from '@/lib/api/rate-limit'
+import { logger } from '@/lib/logger'
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getDashboardMetrics, getContractsWidget } from '@/lib/data/dashboard';
 import { rateLimit } from '@/lib/rate-limit';
-import { logError } from '@/lib/logger';
+
 import { z } from 'zod';
 
 const chatSchema = z.object({
@@ -14,6 +17,10 @@ const chatSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
+  if (!validateOrigin(request)) {
+    return new Response(JSON.stringify({ error: 'Origem não permitida' }), { status: 403, headers: { 'Content-Type': 'application/json' } })
+  }
+
   const ip = request.headers.get('x-forwarded-for') || 'unknown';
   
   if (!rateLimit(ip, 20)) {
@@ -117,3 +124,8 @@ REGRAS:
   }
 }
 
+
+
+export async function OPTIONS() {
+  return new Response(null, { status: 204 })
+}

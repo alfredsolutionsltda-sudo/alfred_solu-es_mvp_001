@@ -1,3 +1,7 @@
+import { validateOrigin } from '@/lib/csrf'
+import { checkRateLimit, rateLimitResponse, LIMITS } from '@/lib/api/rate-limit'
+import { sanitizeText } from '@/lib/sanitize'
+import { logger } from '@/lib/logger'
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { rateLimit } from '@/lib/rate-limit';
@@ -134,7 +138,12 @@ Formato:
     console.error('Error in Alfred analysis:', error);
     return NextResponse.json({ 
       error: 'Failed to generate analysis',
-      details: error.message 
+      details: 'Erro interno. Tente novamente.' 
     }, { status: 500 });
   }
+}
+
+
+export async function OPTIONS() {
+  return new Response(null, { status: 204 })
 }

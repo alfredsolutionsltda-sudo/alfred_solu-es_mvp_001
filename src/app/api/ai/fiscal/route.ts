@@ -1,3 +1,7 @@
+import { validateOrigin } from '@/lib/csrf'
+import { checkRateLimit, rateLimitResponse, LIMITS } from '@/lib/api/rate-limit'
+import { sanitizeText } from '@/lib/sanitize'
+import { logger } from '@/lib/logger'
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getFiscalMetrics } from '@/lib/data/fiscal';
@@ -11,6 +15,10 @@ const fiscalSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
+  if (!validateOrigin(request)) {
+    return new Response(JSON.stringify({ error: 'Origem não permitida' }), { status: 403, headers: { 'Content-Type': 'application/json' } })
+  }
+
   const ip = request.headers.get('x-forwarded-for') || 'unknown';
   
   if (!rateLimit(ip, 20)) {
@@ -97,4 +105,9 @@ export async function POST(request: NextRequest) {
     console.error('Unexpected error in fiscal AI route:', error);
     return NextResponse.json({ error: error?.message || 'Internal Server Error' }, { status: 500 });
   }
+}
+
+
+export async function OPTIONS() {
+  return new Response(null, { status: 204 })
 }

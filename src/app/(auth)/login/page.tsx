@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -16,6 +16,20 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  useEffect(() => {
+    // Check URL for Supabase Auth errors (like expired tokens)
+    const hash = window.location.hash
+    if (hash && hash.includes('error=')) {
+      const params = new URLSearchParams(hash.substring(1))
+      const errorDesc = params.get('error_description')?.toLowerCase() || ''
+      if (errorDesc.includes('token') || errorDesc.includes('expired')) {
+        setError('Este link de redefinição expirou. Solicite um novo link.')
+      } else {
+        setError('Ocorreu um erro na autenticação.')
+      }
+    }
+  }, [])
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
@@ -24,7 +38,11 @@ export default function LoginPage() {
     const { error } = await supabase.auth.signInWithPassword({ email, password })
 
     if (error) {
-      setError('E-mail ou senha inválidos. Tente novamente.')
+      if (error.message.includes('token') || error.message.includes('expired')) {
+        setError('Este link de redefinição expirou. Solicite um novo link.')
+      } else {
+        setError('E-mail ou senha inválidos. Tente novamente.')
+      }
     } else {
       router.push('/dashboard')
       router.refresh()
@@ -96,7 +114,7 @@ export default function LoginPage() {
                 <label htmlFor="password" className="block text-[9px] md:text-[10px] font-black text-neutral-400 uppercase tracking-[0.2em]">
                   Senha
                 </label>
-                <Link href="#" className="text-[9px] md:text-[10px] font-black text-[#1455CE] uppercase tracking-widest hover:opacity-70 transition-opacity">
+                <Link href="/auth/reset-password" className="text-[9px] md:text-[10px] font-black text-[#1455CE] uppercase tracking-widest hover:opacity-70 transition-opacity">
                   Esqueci a senha
                 </Link>
               </div>

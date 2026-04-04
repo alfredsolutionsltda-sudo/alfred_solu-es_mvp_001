@@ -1,9 +1,16 @@
+import { validateOrigin } from '@/lib/csrf'
+import { checkRateLimit, rateLimitResponse, LIMITS } from '@/lib/api/rate-limit'
+import { logger } from '@/lib/logger'
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { Resend } from 'resend'
 import { buildUrl } from '@/lib/url'
 
 export async function POST(request: Request) {
+  if (!validateOrigin(request)) {
+    return new Response(JSON.stringify({ error: 'Origem não permitida' }), { status: 403, headers: { 'Content-Type': 'application/json' } })
+  }
+
   const resend = new Resend(process.env.RESEND_API_KEY)
   try {
     const { contractId, slug, clientEmail, clientName, title } = await request.json()
@@ -83,8 +90,13 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true, data })
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Erro interno do servidor'
+    const message = error instanceof Error ? 'Erro interno. Tente novamente.' : 'Erro interno do servidor'
     console.error('Erro na API de envio de contrato:', error)
     return NextResponse.json({ error: message }, { status: 500 })
   }
+}
+
+
+export async function OPTIONS() {
+  return new Response(null, { status: 204 })
 }

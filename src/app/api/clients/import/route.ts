@@ -1,3 +1,6 @@
+import { validateOrigin } from '@/lib/csrf'
+import { checkRateLimit, rateLimitResponse, LIMITS } from '@/lib/api/rate-limit'
+import { logger } from '@/lib/logger'
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { importClientsFromCSV } from '@/lib/data/clients';
@@ -52,4 +55,9 @@ export async function POST(req: Request) {
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });
   }
+}
+
+
+export async function OPTIONS() {
+  return new Response(null, { status: 204 })
 }
