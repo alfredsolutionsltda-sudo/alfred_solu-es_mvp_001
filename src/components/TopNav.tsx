@@ -37,9 +37,10 @@ const navLinks = [
 interface TopNavProps {
   userEmail?: string
   userName?: string
+  userPlan?: string | null
 }
 
-export default function TopNav({ userEmail, userName }: TopNavProps) {
+export default function TopNav({ userEmail, userName, userPlan }: TopNavProps) {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
@@ -236,7 +237,39 @@ export default function TopNav({ userEmail, userName }: TopNavProps) {
               <p className="text-[9px] font-black text-neutral-300 uppercase tracking-[0.2em] leading-none mb-1">
                 Operador
               </p>
-              <p className="text-sm font-black text-neutral-900 tracking-tight">{displayName}</p>
+              <p className="text-sm font-black text-neutral-900 tracking-tight">
+                {userPlan === 'founder' && (
+                  <span style={{
+                    background: '#D97706',
+                    color: 'white',
+                    fontSize: 9,
+                    fontWeight: 800,
+                    padding: '2px 7px',
+                    borderRadius: 100,
+                    letterSpacing: 1,
+                    marginRight: 6,
+                    verticalAlign: 'middle'
+                  }}>
+                    FUNDADOR
+                  </span>
+                )}
+                {userPlan === 'builder' && (
+                  <span style={{
+                    background: '#1455CE',
+                    color: 'white',
+                    fontSize: 9,
+                    fontWeight: 800,
+                    padding: '2px 7px',
+                    borderRadius: 100,
+                    letterSpacing: 1,
+                    marginRight: 6,
+                    verticalAlign: 'middle'
+                  }}>
+                    BUILDER
+                  </span>
+                )}
+                {displayName}
+              </p>
             </div>
             
             <button

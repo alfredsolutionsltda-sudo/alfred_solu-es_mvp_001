@@ -2,12 +2,16 @@
 
 import { Profile } from '@/types/database'
 import { Award, CheckCircle } from 'lucide-react'
+import { getPlanConfig } from '@/types/plans'
 
 interface ProfileSidebarProps {
   profile: Profile
 }
 
 export default function ProfileSidebar({ profile }: ProfileSidebarProps) {
+  // Busca config do plano atual
+  const planConfig = getPlanConfig(profile.plan)
+  
   // Gera cor consistente baseada no nome
   const getAvatarColor = (name: string) => {
     const colors = [
@@ -88,35 +92,90 @@ export default function ProfileSidebar({ profile }: ProfileSidebarProps) {
         </div>
       </div>
 
-      {/* Card de Plano */}
-      <div className="bg-white rounded-[24px] p-6 lg:p-8 shadow-[0_4px_20px_rgba(0,0,0,0.03)] space-y-6 border border-[#1455CE]/10">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-[#1455CE]/10 flex items-center justify-center">
-            <Award className="text-[#1455CE]" size={24} />
-          </div>
-          <div>
-            <p className="text-[10px] font-black text-neutral-400 uppercase tracking-widest leading-none mb-1">
-              Plano Atual
+      {/* Card de Plano Dinâmico */}
+      {planConfig ? (
+        <div style={{
+          background: 'white',
+          borderRadius: 24,
+          padding: '24px',
+          border: `2px solid ${planConfig.badgeColor}20`,
+          boxShadow: '0_4px_20px_rgba(0,0,0,0.03)',
+        }}>
+          <p style={{ fontSize: 11, color: '#8A8A85', 
+            textTransform: 'uppercase', letterSpacing: 2,
+            marginBottom: 8, fontWeight: 900 }}>
+            Plano Atual
+          </p>
+          
+          {/* Badge do plano */}
+          <span style={{
+            background: planConfig.badgeColor,
+            color: 'white',
+            borderRadius: 100,
+            padding: '4px 14px',
+            fontSize: 12,
+            fontWeight: 700,
+            letterSpacing: 1,
+            display: 'inline-block'
+          }}>
+            {planConfig.badge}
+          </span>
+          
+          {/* Nome e preço */}
+          <p style={{ 
+            fontSize: 18, fontWeight: 700, 
+            marginTop: 10, color: '#0F1117' 
+          }}>
+            {planConfig.name}
+          </p>
+          <p style={{ fontSize: 13, color: '#8A8A85' }}>
+            {planConfig.price} · Vitalício
+          </p>
+          
+          {/* Data de entrada */}
+          {profile.plan_purchased_at && (
+            <p style={{ fontSize: 11, color: '#8A8A85', marginTop: 6 }}>
+              Membro desde{' '}
+              {new Date(profile.plan_purchased_at)
+                .toLocaleDateString('pt-BR', { 
+                  month: 'long', year: 'numeric' 
+                })}
             </p>
-            <h3 className="text-lg font-headline font-bold text-neutral-900">Fundador</h3>
-          </div>
+          )}
+          
+          {/* Badge especial para Founder */}
+          {profile.plan === 'founder' && (
+            <div style={{
+              marginTop: 10,
+              background: '#FEF3C7',
+              borderRadius: 8,
+              padding: '6px 10px',
+              fontSize: 11,
+              color: '#D97706',
+              fontWeight: 600,
+            }}>
+              ⭐ Membro Fundador — Você ajudou a construir o Alfred
+            </div>
+          )}
         </div>
-        
-        <div className="bg-neutral-50 rounded-2xl p-4 space-y-3">
-          <div className="flex items-center gap-2 text-[#1455CE]">
-            <CheckCircle size={14} />
-            <span className="text-xs font-bold">Acesso ilimitado</span>
-          </div>
-          <div className="flex items-center gap-2 text-[#1455CE]">
-            <CheckCircle size={14} />
-            <span className="text-xs font-bold">IA estrategista ativada</span>
-          </div>
+      ) : (
+        <div style={{
+          background: '#FEE2E2', borderRadius: 24,
+          padding: '24px', border: '1px solid #FCA5A5',
+          boxShadow: '0_4px_20px_rgba(0,0,0,0.03)',
+        }}>
+          <p style={{ fontSize: 13, color: '#DC2626', fontWeight: 600 }}>
+            Nenhum plano ativo
+          </p>
+          <a href="https://alfred.com.br/#planos" style={{
+            fontSize: 12, color: '#DC2626', 
+            textDecoration: 'underline', marginTop: 4,
+            display: 'block'
+          }}>
+            Ver planos →
+          </a>
         </div>
-        
-        <div className="text-[10px] font-black text-green-600 uppercase tracking-widest text-center px-4 py-2 bg-green-50 rounded-full border border-green-100">
-           Acesso Vitalício Ativado
-        </div>
-      </div>
+      )}
     </div>
   )
 }

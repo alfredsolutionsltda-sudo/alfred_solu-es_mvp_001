@@ -23,7 +23,7 @@ export default async function DashboardLayout({
   // Busca o perfil do usuário
   const { data: profile } = await supabase
     .from('profiles')
-    .select('full_name, email')
+    .select('full_name, email, plan')
     .eq('id', user.id)
     .single()
 
@@ -34,6 +34,7 @@ export default async function DashboardLayout({
       <TopNav
         userEmail={user.email}
         userName={profile?.full_name ?? undefined}
+        userPlan={profile?.plan ?? null}
       />
       <main className="flex-1 pt-20 pb-20 md:pb-0">
         {children}

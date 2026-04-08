@@ -21,6 +21,11 @@ export interface Profile {
   contract_tone: string | null
   special_clauses: string | null
   alfred_context: string | null
+  plan: 'builder' | 'founder' | 'team' | null
+  plan_purchased_at: string | null
+  whop_member_id: string | null
+  whop_order_id: string | null
+  is_authorized: boolean
   created_at: string
   updated_at: string
 }
