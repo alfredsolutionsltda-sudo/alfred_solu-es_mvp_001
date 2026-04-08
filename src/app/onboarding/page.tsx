@@ -125,9 +125,12 @@ O bloco atual da conversa que deve ser avaliado como concluído ou não é o BLO
           const parsed = JSON.parse(jsonMatch[0]);
           return parsed;
         }
+      } else {
+        const errorText = await response.text();
+        console.error('Erro na extração de dados (AI):', response.status, errorText);
       }
     } catch (e) {
-      console.error(e);
+      console.error('Exceção ao extrair dados:', e);
     }
     return null;
   };
@@ -316,7 +319,11 @@ Se terminar o bloco ${newBlock}, faça a transição naturalmente.`;
         })
       });
 
-      if (!response.ok) throw new Error("Falha na chamada ao AI");
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Falha na chamada ao AI:', response.status, errorData);
+        throw new Error(`Falha na chamada ao AI: ${response.status}`);
+      }
 
       const data = await response.json();
       const aiReply = data.choices[0].message.content;

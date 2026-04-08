@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/server';
 
 export async function POST(request: Request) {
   if (!validateOrigin(request)) {
+    console.error('CSRF Validation failed for origin:', request.headers.get('origin'));
     return new Response(JSON.stringify({ error: 'Origem não permitida' }), { status: 403, headers: { 'Content-Type': 'application/json' } })
   }
 
@@ -63,8 +64,15 @@ export async function POST(request: Request) {
 
     if (!response.ok) {
       const errorData = await response.text();
-      console.error('Groq API Error:', errorData);
-      return NextResponse.json({ error: 'Failed to fetch response from AI model' }, { status: 500 });
+      console.error('Groq API Error Details:', {
+        status: response.status,
+        statusText: response.statusText,
+        body: errorData
+      });
+      return NextResponse.json({ 
+        error: 'Failed to fetch response from AI model',
+        details: errorData 
+      }, { status: response.status || 500 });
     }
 
     const data = await response.json();
@@ -72,8 +80,14 @@ export async function POST(request: Request) {
     return NextResponse.json(data);
 
   } catch (error: any) {
-    console.error('Unexpected error in AI route:', error);
-    return NextResponse.json({ error: error?.message || 'Internal Server Error' }, { status: 500 });
+    console.error('Unexpected error in AI route:', {
+      message: error?.message,
+      stack: error?.stack
+    });
+    return NextResponse.json({ 
+      error: 'Internal Server Error in AI Route',
+      message: error?.message || 'Erro desconhecido'
+    }, { status: 500 });
   }
 }
 
