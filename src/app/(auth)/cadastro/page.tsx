@@ -1,15 +1,18 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, Suspense } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { MailCheck } from 'lucide-react'
-import Image from 'next/image'
 
-export default function CadastroPage() {
+function CadastroContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const supabase = createClient()
+
+  const fromWhop = searchParams.get('from') === 'whop'
+  const planParam = searchParams.get('plan')
 
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
@@ -80,6 +83,34 @@ export default function CadastroPage() {
 
         {/* Card */}
         <div className="bg-white rounded-[28px] md:rounded-[32px] p-6 md:p-10 shadow-[0_20px_60px_rgba(0,0,0,0.05)] border border-neutral-100">
+          
+          {/* Banner do Whop */}
+          {fromWhop && (
+            <div style={{
+              background: planParam === 'founder' 
+                ? '#FEF3C7' : '#EBF0FC',
+              borderRadius: 12,
+              padding: '12px 16px',
+              marginBottom: 20,
+              border: `1px solid ${planParam === 'founder' ? '#FCD34D' : '#BFDBFE'}`,
+            }}>
+              <p style={{ 
+                fontSize: 13, fontWeight: 700,
+                color: planParam === 'founder' ? '#D97706' : '#1455CE',
+                margin: 0,
+              }}>
+                {planParam === 'founder' 
+                  ? '⭐ Seu Plano Fundador está garantido!' 
+                  : '🚀 Seu Plano Builder está garantido!'}
+              </p>
+              <p style={{ 
+                fontSize: 12, color: '#6B7280', margin: '4px 0 0' 
+              }}>
+                Crie sua conta com o mesmo e-mail usado no pagamento.
+              </p>
+            </div>
+          )}
+
           <h1 className="text-xl md:text-2xl font-black text-neutral-900 tracking-tight mb-2">
             Crie sua conta
           </h1>
@@ -146,7 +177,7 @@ export default function CadastroPage() {
               {loading ? (
                 <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               ) : (
-                'Criar conta gratuita'
+                'Criar conta'
               )}
             </button>
           </form>
@@ -167,5 +198,13 @@ export default function CadastroPage() {
         </p>
       </div>
     </main>
+  )
+}
+
+export default function CadastroPage() {
+  return (
+    <Suspense fallback={<div>Carregando...</div>}>
+      <CadastroContent />
+    </Suspense>
   )
 }
