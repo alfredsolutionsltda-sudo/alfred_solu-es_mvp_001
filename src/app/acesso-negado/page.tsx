@@ -8,7 +8,7 @@ export default function AcessoNegadoPage() {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      fontFamily: 'system-ui',
+      fontFamily: 'var(--font-inter), system-ui, sans-serif',
     }}>
       <div style={{
         background: 'white',
@@ -20,16 +20,22 @@ export default function AcessoNegadoPage() {
       }}>
         {/* Logo */}
         <div style={{
-          width: 64, height: 64,
-          background: '#1455CE',
-          borderRadius: 16,
+          width: 80, height: 80,
+          borderRadius: 22,
+          overflow: 'hidden',
+          background: 'white',
+          boxShadow: '0 8px 32px rgba(20, 85, 206, 0.15)',
+          border: '2px solid white',
+          margin: '0 auto 24px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          fontSize: 28, color: 'white', fontWeight: 900,
-          margin: '0 auto 24px',
         }}>
-          A
+          <img 
+            src="/images/alfred-head.png" 
+            alt="Alfred" 
+            style={{ width: '100%', height: '100%', objectFit: 'contain', padding: 4 }}
+          />
         </div>
 
         <h1 style={{ 

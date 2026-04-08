@@ -4,6 +4,7 @@ import { useState, Suspense } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import { MailCheck } from 'lucide-react'
 
 function CadastroContent() {
@@ -70,10 +71,11 @@ function CadastroContent() {
         {/* Logo */}
         <div className="flex flex-col items-center justify-center mb-8 md:mb-10 group">
           <div className="relative w-16 h-16 md:w-20 md:h-20 rounded-[22px] md:rounded-[28px] overflow-hidden bg-white shadow-2xl shadow-[#1455CE]/20 group-hover:scale-110 transition-transform duration-500 ease-out border-2 border-white">
-            <img 
+            <Image 
               src="/images/alfred-head.png" 
               alt="Alfred" 
-              className="w-full h-full object-contain p-1.5"
+              fill
+              className="object-contain p-1.5"
             />
           </div>
           <h1 className="mt-4 text-xl md:text-2xl font-headline font-black text-neutral-900 tracking-tighter">

@@ -57,7 +57,7 @@ module.exports = {
         "on-error-container": "#93000a",
       },
       fontFamily: {
-        headline: ['var(--font-plus-jakarta)', 'Inter', 'sans-serif'],
+        headline: ['var(--font-inter)', 'system-ui', 'sans-serif'],
         body: ['var(--font-inter)', 'system-ui', 'sans-serif'],
         label: ['var(--font-inter)', 'system-ui', 'sans-serif'],
       },

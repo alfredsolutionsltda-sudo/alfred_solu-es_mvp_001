@@ -30,7 +30,7 @@ export async function POST(request: Request) {
       .from('profiles')
       .select('alfred_context')
       .eq('id', userId)
-      .single();
+      .maybeSingle();
 
     if (profileError) {
       console.error('Error fetching profile:', profileError);
@@ -38,7 +38,7 @@ export async function POST(request: Request) {
     }
 
     // Se alfred_context existir, usa ele. Se não, usa o systemPrompt recebido.
-    const activeSystemPrompt = profile?.alfred_context || systemPrompt || "You are Alfred, a helpful AI assistant.";
+    const activeSystemPrompt = profile?.alfred_context || systemPrompt || "Você é o Alfred, assistente digital e estrategista de alto nível.";
 
     const groqApiKey = process.env.GROQ_API_KEY;
     if (!groqApiKey) {
