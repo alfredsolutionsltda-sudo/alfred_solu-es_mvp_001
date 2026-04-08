@@ -57,11 +57,10 @@ export default function ResetPasswordPage() {
       <div className="w-full max-w-[420px] animate-[fadeIn_0.5s_ease-out] py-8">
         <div className="flex flex-col items-center justify-center mb-8 md:mb-10 group">
           <div className="relative w-16 h-16 md:w-20 md:h-20 rounded-[22px] md:rounded-[28px] overflow-hidden bg-white shadow-2xl shadow-[#1455CE]/20 group-hover:scale-110 transition-transform duration-500 ease-out border-2 border-white">
-            <Image 
+            <img 
               src="/images/alfred-head.png" 
               alt="Alfred" 
-              fill
-              className="object-contain p-1.5"
+              className="w-full h-full object-contain p-1.5"
             />
           </div>
         </div>

@@ -114,11 +114,10 @@ export default function TopNav({ userEmail, userName, userPlan }: TopNavProps) {
           {/* Logo */}
           <Link href="/dashboard" className="flex items-center gap-3 group shrink-0">
             <div className="relative w-10 h-10 md:w-12 md:h-12 rounded-[14px] md:rounded-[16px] overflow-hidden shadow-2xl shadow-[#1455CE]/20 group-hover:scale-110 transition-transform duration-500 ease-out border-2 border-white bg-white">
-              <Image 
+              <img 
                 src="/images/alfred-head.png" 
                 alt="Alfred" 
-                fill
-                className="object-contain p-1"
+                className="w-full h-full object-contain p-1"
               />
             </div>
             <span className="text-lg md:text-xl font-headline font-black text-neutral-900 tracking-tighter leading-none">Alfred</span>

@@ -352,11 +352,10 @@ Se terminar o bloco ${newBlock}, faça a transição naturalmente.`;
         <div className="px-6 md:px-10 py-4 md:py-8 bg-white/50 backdrop-blur-md border-b border-neutral-50 flex items-center justify-between z-10 pt-safe">
           <div className="flex items-center gap-4 md:gap-6">
             <div className="relative w-12 h-12 md:w-16 md:h-16 rounded-[16px] md:rounded-[22px] overflow-hidden shadow-2xl shadow-[#1455CE]/20 border-2 border-white bg-white shrink-0">
-               <Image 
+               <img 
                 src="/images/alfred-head.png" 
                 alt="Alfred" 
-                fill
-                className="object-contain p-1.5"
+                className="w-full h-full object-contain p-1.5"
               />
             </div>
             <div className="flex flex-col">
