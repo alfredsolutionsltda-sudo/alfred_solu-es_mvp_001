@@ -62,7 +62,8 @@ export async function middleware(request: NextRequest) {
 
   // Verifica autorização (plano ativo)
   if (!pathname.startsWith('/onboarding') && 
-      !pathname.startsWith('/acesso-negado')) {
+      !pathname.startsWith('/acesso-negado') &&
+      !pathname.startsWith('/api/')) {
     
     const { data: profile } = await supabase
       .from('profiles')
