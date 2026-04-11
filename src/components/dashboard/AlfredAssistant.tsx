@@ -61,8 +61,12 @@ export default function AlfredAssistant({ isOpen, onClose }: AlfredAssistantProp
       {/* Header */}
       <div className="p-6 border-b border-neutral-100/50 flex items-center justify-between bg-gradient-to-r from-[#1455CE]/5 to-transparent">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-[#1455CE] flex items-center justify-center shadow-lg shadow-[#1455CE]/20">
-            <Bot size={20} className="text-white" />
+          <div className="w-10 h-10 rounded-2xl bg-white flex items-center justify-center shadow-lg shadow-[#1455CE]/10 border border-neutral-100 overflow-hidden">
+            <img 
+              src="/images/alfred-avatar.png" 
+              alt="Alfred" 
+              className="w-full h-full object-contain"
+            />
           </div>
           <div>
             <h3 className="text-sm font-black text-neutral-900 tracking-tight uppercase">Alfred AI</h3>
@@ -88,10 +92,15 @@ export default function AlfredAssistant({ isOpen, onClose }: AlfredAssistantProp
         {messages.map((msg, i) => (
           <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div className={`flex gap-3 max-w-[85%] ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
-              <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 shadow-sm ${
-                msg.role === 'user' ? 'bg-neutral-900' : 'bg-[#1455CE]'
-              }`}>
-                {msg.role === 'user' ? <User size={14} className="text-white" /> : <Sparkles size={14} className="text-white" />}
+                {msg.role === 'user' ? (
+                  <User size={14} className="text-white" />
+                ) : (
+                  <img 
+                    src="/images/alfred-avatar.png" 
+                    alt="Alfred" 
+                    className="w-full h-full object-contain p-0.5"
+                  />
+                )}
               </div>
               <div className={`p-4 rounded-2xl text-[13px] font-bold leading-relaxed shadow-sm ${
                 msg.role === 'user' 

@@ -1,5 +1,6 @@
 import { ButtonHTMLAttributes, ReactNode } from 'react'
 import { Bot, Sparkles, Send, Plus, ArrowRight } from 'lucide-react'
+import Image from 'next/image'
 
 interface AlfredButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'ghost' | 'outline'
@@ -49,10 +50,18 @@ export default function AlfredButton({
       {...props}
     >
       {Icon && (
-        <Icon 
-          size={size === 'sm' ? 14 : 18} 
-          className="leading-none stroke-[2.5px]"
-        />
+        iconName === 'bot' ? (
+          <img 
+            src="/images/alfred-avatar.png" 
+            alt="Alfred" 
+            className={`${size === 'sm' ? 'w-4 h-4' : 'w-5 h-5'} object-contain`}
+          />
+        ) : (
+          <Icon 
+            size={size === 'sm' ? 14 : 18} 
+            className="leading-none stroke-[2.5px]"
+          />
+        )
       )}
       {children}
     </button>

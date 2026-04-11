@@ -360,9 +360,9 @@ Se terminar o bloco ${newBlock}, faça a transição naturalmente.`;
           <div className="flex items-center gap-4 md:gap-6">
             <div className="relative w-12 h-12 md:w-16 md:h-16 rounded-[16px] md:rounded-[22px] overflow-hidden shadow-2xl shadow-[#1455CE]/20 border-2 border-white bg-white shrink-0">
                <img 
-                src="/images/alfred-head.png" 
+                src="/images/alfred-avatar.png" 
                 alt="Alfred" 
-                className="w-full h-full object-contain p-1.5"
+                className="w-full h-full object-contain p-0.5"
               />
             </div>
             <div className="flex flex-col">
@@ -393,11 +393,15 @@ Se terminar o bloco ${newBlock}, faça a transição naturalmente.`;
               className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'} animate-[fadeIn_0.5s_ease-out]`}
             >
               <div className={`flex items-end gap-2 md:gap-3 max-w-[90%] md:max-w-[85%] ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
-                <div className={`w-7 h-7 md:w-8 md:h-8 rounded-lg md:rounded-xl flex items-center justify-center shrink-0 shadow-sm ${
-                    msg.role === 'assistant' ? 'bg-[#1455CE]/10 text-[#1455CE]' : 'bg-neutral-100 text-neutral-400'
-                }`}>
-                    {msg.role === 'assistant' ? <Bot size={14} className="md:size-4" /> : <User size={14} className="md:size-4" />}
-                </div>
+                    {msg.role === 'assistant' ? (
+                      <img 
+                        src="/images/alfred-avatar.png" 
+                        alt="Alfred" 
+                        className="w-full h-full object-contain p-0.5"
+                      />
+                    ) : (
+                      <User size={14} className="md:size-4" />
+                    )}
                 <div 
                     className={`px-4 md:px-6 py-3 md:py-4 rounded-[20px] md:rounded-[24px] font-bold text-sm leading-relaxed shadow-sm ${
                         msg.role === 'user' 
@@ -417,8 +421,12 @@ Se terminar o bloco ${newBlock}, faça a transição naturalmente.`;
           {loading && (
             <div className="flex flex-col items-start animate-pulse">
                 <div className="flex items-end gap-3">
-                    <div className="w-8 h-8 rounded-xl bg-[#1455CE]/10 text-[#1455CE] flex items-center justify-center">
-                        <Bot size={16} />
+                    <div className="w-8 h-8 rounded-xl bg-white border border-neutral-100 flex items-center justify-center overflow-hidden">
+                        <img 
+                          src="/images/alfred-avatar.png" 
+                          alt="Alfred" 
+                          className="w-full h-full object-contain"
+                        />
                     </div>
                     <div className="bg-neutral-50 border border-neutral-100 rounded-[24px] rounded-bl-none px-6 py-4 flex items-center gap-1.5">
                         <div className="w-1.5 h-1.5 bg-[#1455CE]/40 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />

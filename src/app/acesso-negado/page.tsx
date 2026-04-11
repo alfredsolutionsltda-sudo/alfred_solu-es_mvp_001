@@ -32,9 +32,9 @@ export default function AcessoNegadoPage() {
           justifyContent: 'center',
         }}>
           <img 
-            src="/images/alfred-head.png" 
+            src="/images/alfred-avatar.png" 
             alt="Alfred" 
-            style={{ width: '100%', height: '100%', objectFit: 'contain', padding: 4 }}
+            style={{ width: '100%', height: '100%', objectFit: 'contain' }}
           />
         </div>
 
