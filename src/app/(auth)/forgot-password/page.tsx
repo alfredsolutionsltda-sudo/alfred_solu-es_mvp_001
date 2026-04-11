@@ -25,7 +25,8 @@ export default function ForgotPasswordPage() {
     })
 
     if (error) {
-      setError(error.message === 'User not found' ? 'E-mail não encontrado.' : 'Ocorreu um erro. Tente novamente.')
+      console.error('Erro na recuperação de senha:', error)
+      setError(error.message)
     } else {
       setSuccess(true)
     }
