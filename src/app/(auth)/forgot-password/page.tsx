@@ -20,17 +20,28 @@ export default function ForgotPasswordPage() {
     setLoading(true)
     setError(null)
 
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth/callback?next=/auth/reset-password`,
-    })
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth/callback?next=/auth/reset-password`,
+      })
 
-    if (error) {
-      console.error('Erro na recuperação de senha:', error)
-      setError(error.message)
-    } else {
-      setSuccess(true)
+      if (error) {
+        console.error('Erro detalhado na recuperação de senha:', error)
+        // Tratamento amigável para erro de chave inválida
+        if (error.message.includes('API key')) {
+          setError('Erro de configuração do servidor (API Key). Por favor, tente novamente mais tarde ou contate o suporte.')
+        } else {
+          setError(error.message)
+        }
+      } else {
+        setSuccess(true)
+      }
+    } catch (err) {
+      console.error('Exceção capturada no reset password:', err)
+      setError('Ocorreu um erro inesperado ao processar sua solicitação.')
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   return (

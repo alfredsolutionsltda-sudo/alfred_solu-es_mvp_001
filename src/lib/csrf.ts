@@ -6,6 +6,7 @@ export async function validateOrigin(): Promise<boolean> {
   
   const allowedOrigins = [
     process.env.NEXT_PUBLIC_APP_URL,
+    'https://alfred-platform.vercel.app',
     'http://localhost:3000',
     'http://localhost:3001',
   ].filter(Boolean)
