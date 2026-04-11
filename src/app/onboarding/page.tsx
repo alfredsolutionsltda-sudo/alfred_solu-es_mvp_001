@@ -360,7 +360,7 @@ Se terminar o bloco ${newBlock}, faça a transição naturalmente.`;
           <div className="flex items-center gap-4 md:gap-6">
             <div className="relative w-12 h-12 md:w-16 md:h-16 rounded-[16px] md:rounded-[22px] overflow-hidden shadow-2xl shadow-[#1455CE]/20 border-2 border-white bg-white shrink-0">
                <img 
-                src="/images/alfred-avatar.png" 
+                src="/images/alfred-head.png" 
                 alt="Alfred" 
                 className="w-full h-full object-contain p-0.5"
               />
@@ -398,7 +398,7 @@ Se terminar o bloco ${newBlock}, faça a transição naturalmente.`;
                 } overflow-hidden`}>
                     {msg.role === 'assistant' ? (
                       <img 
-                        src="/images/alfred-avatar.png" 
+                        src="/images/alfred-head.png" 
                         alt="Alfred" 
                         className="w-full h-full object-contain p-0.5"
                       />
@@ -427,7 +427,7 @@ Se terminar o bloco ${newBlock}, faça a transição naturalmente.`;
                 <div className="flex items-end gap-3">
                     <div className="w-8 h-8 rounded-xl bg-white border border-neutral-100 flex items-center justify-center overflow-hidden">
                         <img 
-                          src="/images/alfred-avatar.png" 
+                          src="/images/alfred-head.png" 
                           alt="Alfred" 
                           className="w-full h-full object-contain"
                         />

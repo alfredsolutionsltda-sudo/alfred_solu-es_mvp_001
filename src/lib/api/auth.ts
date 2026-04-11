@@ -7,7 +7,10 @@ export async function requireAuth() {
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: { get: (name) => cookieStore.get(name)?.value } }
+    { 
+      cookieOptions: { name: 'alfred-br-session' },
+      cookies: { get: (name) => cookieStore.get(name)?.value } 
+    }
   )
 
   const { data: { session }, error } = await supabase.auth.getSession()
@@ -34,7 +37,10 @@ export async function requireAuthWithProfile() {
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: { get: (name) => cookieStore.get(name)?.value } }
+    { 
+      cookieOptions: { name: 'alfred-br-session' },
+      cookies: { get: (name) => cookieStore.get(name)?.value } 
+    }
   )
 
   const { data: profile } = await supabase

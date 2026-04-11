@@ -63,7 +63,7 @@ export default function AlfredAssistant({ isOpen, onClose }: AlfredAssistantProp
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-2xl bg-white flex items-center justify-center shadow-lg shadow-[#1455CE]/10 border border-neutral-100 overflow-hidden">
             <img 
-              src="/images/alfred-avatar.png" 
+              src="/images/alfred-head.png" 
               alt="Alfred" 
               className="w-full h-full object-contain"
             />
@@ -99,7 +99,7 @@ export default function AlfredAssistant({ isOpen, onClose }: AlfredAssistantProp
                   <User size={14} className="text-white" />
                 ) : (
                   <img 
-                    src="/images/alfred-avatar.png" 
+                    src="/images/alfred-head.png" 
                     alt="Alfred" 
                     className="w-full h-full object-contain p-0.5"
                   />

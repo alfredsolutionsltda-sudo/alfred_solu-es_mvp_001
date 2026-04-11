@@ -111,7 +111,7 @@ export default function LoginPage() {
                 <label htmlFor="password" className="block text-[9px] md:text-[10px] font-black text-neutral-400 uppercase tracking-[0.2em]">
                   Senha
                 </label>
-                <Link href="/auth/reset-password" className="text-[9px] md:text-[10px] font-black text-[#1455CE] uppercase tracking-widest hover:opacity-70 transition-opacity">
+                <Link href="/forgot-password" className="text-[9px] md:text-[10px] font-black text-[#1455CE] uppercase tracking-widest hover:opacity-70 transition-opacity">
                   Esqueci a senha
                 </Link>
               </div>

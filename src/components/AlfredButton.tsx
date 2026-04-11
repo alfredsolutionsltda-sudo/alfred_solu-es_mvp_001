@@ -52,7 +52,7 @@ export default function AlfredButton({
       {Icon && (
         iconName === 'bot' ? (
           <img 
-            src="/images/alfred-avatar.png" 
+            src="/images/alfred-head.png" 
             alt="Alfred" 
             className={`${size === 'sm' ? 'w-4 h-4' : 'w-5 h-5'} object-contain`}
           />

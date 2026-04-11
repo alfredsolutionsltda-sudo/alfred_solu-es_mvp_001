@@ -1,5 +1,11 @@
 import type { NextConfig } from "next";
 
+// Validação de Segurança de Ambiente (Brazil Platform)
+if (process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('inhkgvtsqqmrckxbbmld')) {
+  console.warn('\x1b[33m%s\x1b[0m', '⚠️ AVISO: A URL do Supabase configurada pode não ser a da plataforma brasileira (BR). Verifique se está usando o projeto correto para evitar conflitos de dados.');
+}
+
+
 import withBundleAnalyzer from '@next/bundle-analyzer';
 
 const bundleAnalyzer = withBundleAnalyzer({
