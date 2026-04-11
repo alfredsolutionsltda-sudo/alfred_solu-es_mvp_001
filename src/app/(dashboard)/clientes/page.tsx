@@ -8,7 +8,7 @@ import ClientsClient from "@/components/clients/ClientsClient";
 export const dynamic = "force-dynamic";
 
 export default async function ClientesPage(props: {
-  searchParams: Promise<{ status?: string; search?: string }>;
+  searchParams: Promise<{ status?: string; search?: string; page?: string }>;
 }) {
   const searchParams = await props.searchParams;
   const supabase = await createClient();
@@ -21,9 +21,12 @@ export default async function ClientesPage(props: {
   }
 
   const { status, search } = searchParams;
+  const page = Number(searchParams.page) || 1;
+  const pageSize = 10;
+  const offset = (page - 1) * pageSize;
 
-  const [clients, metrics] = await Promise.all([
-    getClients(user.id, { status, search }),
+  const [clientsResult, metrics] = await Promise.all([
+    getClients(user.id, { status, search, limit: pageSize, offset }),
     getClientMetrics(user.id),
   ]);
 
@@ -44,7 +47,13 @@ export default async function ClientesPage(props: {
       <ClientMetrics metrics={metrics} />
 
       <div className="space-y-6">
-        <ClientsClient initialClients={clients} userId={user.id} />
+        <ClientsClient 
+          initialClients={clientsResult.data} 
+          userId={user.id} 
+          totalCount={clientsResult.count}
+          currentPage={page}
+          pageSize={pageSize}
+        />
       </div>
     </main>
   );

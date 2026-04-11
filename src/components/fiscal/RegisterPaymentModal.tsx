@@ -42,8 +42,8 @@ export default function RegisterPaymentModal({
     async function loadClients() {
       if (formData.type === 'faturamento') {
         const result = await getClientsAction(userId);
-        if (result.success) {
-          setClients(result.clients || []);
+        if (result.success && result.clients) {
+          setClients(result.clients.data || []);
         }
       }
     }

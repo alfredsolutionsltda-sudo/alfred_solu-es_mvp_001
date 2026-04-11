@@ -4,19 +4,15 @@ import type { NextRequest } from 'next/server'
 
 const PUBLIC_ROUTES = [
   '/login',
-  '/cadastro', 
+  '/cadastro',
   '/auth/callback',
-  '/auth/whop-callback',
-  '/acesso-negado',
 ]
 
 const PUBLIC_PREFIXES = [
   '/contrato/',
   '/proposta/',
   '/_next/',
-  '/images/',
   '/favicon',
-  '/api/webhooks/',        // webhooks são públicos
   '/api/proposals/open',
   '/api/proposals/accept',
   '/api/proposals/refuse',
@@ -25,8 +21,8 @@ const PUBLIC_PREFIXES = [
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  // Permite rotas e prefixos públicos
-  if (PUBLIC_ROUTES.some(r => pathname === r)) {
+  // Permite rotas públicas
+  if (PUBLIC_ROUTES.includes(pathname)) {
     return NextResponse.next()
   }
   if (PUBLIC_PREFIXES.some(p => pathname.startsWith(p))) {
@@ -34,17 +30,36 @@ export async function middleware(request: NextRequest) {
   }
 
   // Verifica sessão
-  const response = NextResponse.next()
+  let response = NextResponse.next({
+    request: {
+      headers: request.headers,
+    },
+  })
+
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get: (name) => request.cookies.get(name)?.value,
-        set: (name, value, options) => {
+        get(name) {
+          return request.cookies.get(name)?.value
+        },
+        set(name, value, options) {
+          request.cookies.set({ name, value, ...options })
+          response = NextResponse.next({
+            request: {
+              headers: request.headers,
+            },
+          })
           response.cookies.set({ name, value, ...options })
         },
-        remove: (name, options) => {
+        remove(name, options) {
+          request.cookies.set({ name, value: '', ...options })
+          response = NextResponse.next({
+            request: {
+              headers: request.headers,
+            },
+          })
           response.cookies.set({ name, value: '', ...options })
         },
       },
@@ -53,53 +68,44 @@ export async function middleware(request: NextRequest) {
 
   const { data: { session } } = await supabase.auth.getSession()
 
-  // Sem sessão → login
+  // Sem sessão: redireciona para login
   if (!session) {
     const loginUrl = new URL('/login', request.url)
     loginUrl.searchParams.set('redirectTo', pathname)
     return NextResponse.redirect(loginUrl)
   }
 
-  // Verifica autorização (plano ativo)
-  if (!pathname.startsWith('/onboarding') && 
-      !pathname.startsWith('/acesso-negado') &&
-      !pathname.startsWith('/api/')) {
-    
+  // Com sessão: verifica onboarding
+  if (!pathname.startsWith('/onboarding') && !pathname.startsWith('/api/')) {
     const { data: profile } = await supabase
       .from('profiles')
-      .select('is_authorized, plan, onboarding_completed')
+      .select('onboarding_completed')
       .eq('id', session.user.id)
       .single()
 
-    // Sem plano → acesso negado
-    if (!profile?.is_authorized || !profile?.plan) {
-      return NextResponse.redirect(
-        new URL('/acesso-negado', request.url)
-      )
-    }
-
-    // Com plano mas sem onboarding → onboarding
-    if (!profile?.onboarding_completed && 
-        !pathname.startsWith('/onboarding')) {
-      return NextResponse.redirect(
-        new URL('/onboarding', request.url)
-      )
-    }
-
-    // Onboarding completo tentando acessar /onboarding → dashboard
-    if (profile?.onboarding_completed && 
-        pathname.startsWith('/onboarding')) {
-      return NextResponse.redirect(
-        new URL('/dashboard', request.url)
-      )
+    if (profile && !profile.onboarding_completed) {
+      return NextResponse.redirect(new URL('/onboarding', request.url))
     }
   }
 
+  // Previne acesso ao onboarding se já completou
+  if (pathname.startsWith('/onboarding')) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('onboarding_completed')
+      .eq('id', session.user.id)
+      .single()
+
+    if (profile?.onboarding_completed) {
+      return NextResponse.redirect(new URL('/dashboard', request.url))
+    }
+  }
+
+  // Adiciona headers de segurança na resposta
+  response.headers.set('X-User-Id', 'authenticated')
   return response
 }
 
 export const config = {
-  matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|images|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'
-  ],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
 }

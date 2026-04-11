@@ -9,8 +9,21 @@ import ImportCSVModal from "./ImportCSVModal";
 import NewContractModal from "../contracts/NewContractModal";
 import { ClientWithMetrics } from "@/types/clients";
 import ScoreUpdater from "./ScoreUpdater";
+import PaginationControl from "../PaginationControl";
 
-export default function ClientsClient({ initialClients, userId }: { initialClients: ClientWithMetrics[], userId: string }) {
+export default function ClientsClient({ 
+  initialClients, 
+  userId,
+  totalCount,
+  currentPage,
+  pageSize
+}: { 
+  initialClients: ClientWithMetrics[], 
+  userId: string,
+  totalCount: number,
+  currentPage: number,
+  pageSize: number
+}) {
   const [selectedClient, setSelectedClient] = useState<ClientWithMetrics | null>(null);
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -26,6 +39,12 @@ export default function ClientsClient({ initialClients, userId }: { initialClien
         />
         
         <ClientTable clients={initialClients} onRowClick={setSelectedClient} />
+        
+        <PaginationControl 
+          totalItems={totalCount} 
+          pageSize={pageSize} 
+          currentPage={currentPage} 
+        />
       </div>
       
       <ClientDrawer 

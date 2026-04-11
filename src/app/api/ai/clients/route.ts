@@ -25,7 +25,7 @@ const clientAiSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
-  if (!validateOrigin(request)) {
+  if (!await await validateOrigin()) {
     return new Response(JSON.stringify({ error: 'Origem não permitida' }), { status: 403, headers: { 'Content-Type': 'application/json' } })
   }
 

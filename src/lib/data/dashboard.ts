@@ -48,21 +48,23 @@ export async function getDashboardMetrics(userId: string, period: DashboardPerio
     .gte('end_date', new Date().toISOString().split('T')[0])
     .lte('end_date', in30Days.toISOString().split('T')[0])
 
-  // Faturamento e Inadimplencia (filtered by period)
-  // Otimizado: Busca apenas somas parciais para evitar carregar milhares de linhas
-  const [
-    { data: pagoData },
-    { data: atrasadoData },
-    { data: pendenteData }
-  ] = await Promise.all([
-    supabase.from('faturamento').select('amount').eq('user_id', userId).eq('status', 'pago').gte('created_at', startDate).lte('created_at', endDate),
-    supabase.from('faturamento').select('amount').eq('user_id', userId).eq('status', 'atrasado').gte('created_at', startDate).lte('created_at', endDate),
-    supabase.from('faturamento').select('amount').eq('user_id', userId).eq('status', 'pendente').gte('created_at', startDate).lte('created_at', endDate)
-  ]);
+  const { data: faturamentoData } = await supabase
+    .from('faturamento')
+    .select('amount, status')
+    .eq('user_id', userId)
+    .gte('created_at', startDate)
+    .lte('created_at', endDate);
 
-  const faturamentoPeriodo = pagoData?.reduce((sum: number, f: any) => sum + Number(f.amount), 0) || 0;
-  const inadimplenciaTotal = atrasadoData?.reduce((sum: number, f: any) => sum + Number(f.amount), 0) || 0;
-  const totalPendente = pendenteData?.reduce((sum: number, f: any) => sum + Number(f.amount), 0) || 0;
+  let faturamentoPeriodo = 0;
+  let inadimplenciaTotal = 0;
+  let totalPendente = 0;
+
+  faturamentoData?.forEach((f: any) => {
+    const amount = Number(f.amount) || 0;
+    if (f.status === 'pago') faturamentoPeriodo += amount;
+    if (f.status === 'atrasado') inadimplenciaTotal += amount;
+    if (f.status === 'pendente') totalPendente += amount;
+  });
 
   // Clientes ativos
   const { count: clientesAtivos } = await supabase
@@ -85,35 +87,31 @@ export async function getContractsWidget(userId: string, period: DashboardPeriod
   const supabase = await createClient()
   const { startDate, endDate } = getPeriodDates(period)
 
-  const { data: contracts } = await supabase
-    .from('contracts')
-    .select('id, title, status, end_date, created_at, value, client_id')
-    .eq('user_id', userId)
-    .gte('created_at', startDate)
-    .lte('created_at', endDate)
-    .order('created_at', { ascending: false })
-
-  const safeContracts = (contracts || []) as Contract[]
+  const [
+    { count: gerados },
+    { count: assinados },
+    { count: ativos },
+    { count: expirados },
+    { data: expiringContracts }
+  ] = await Promise.all([
+    supabase.from('contracts').select('*', { count: 'exact', head: true }).eq('user_id', userId).gte('created_at', startDate).lte('created_at', endDate),
+    supabase.from('contracts').select('*', { count: 'exact', head: true }).eq('user_id', userId).eq('status', 'assinado').gte('created_at', startDate).lte('created_at', endDate),
+    supabase.from('contracts').select('*', { count: 'exact', head: true }).eq('user_id', userId).eq('status', 'ativo').gte('created_at', startDate).lte('created_at', endDate),
+    supabase.from('contracts').select('*', { count: 'exact', head: true }).eq('user_id', userId).eq('status', 'expirado').gte('created_at', startDate).lte('created_at', endDate),
+    // Contratos ativos vencendo em 30 dias
+    supabase.from('contracts').select('id').eq('user_id', userId).eq('status', 'ativo').gte('end_date', new Date().toISOString()).lte('end_date', new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString())
+  ]);
 
   const statuses = {
-    gerados: safeContracts.length,
-    assinados: safeContracts.filter(c => c.status === 'assinado').length,
-    ativos: safeContracts.filter(c => c.status === 'ativo').length,
-    vencendo: safeContracts.filter(c => {
-      if (!c.end_date) return false
-      const end = new Date(c.end_date)
-      const now = new Date()
-      const diffInfoDays = (end.getTime() - now.getTime()) / (1000 * 3600 * 24)
-      return diffInfoDays <= 30 && diffInfoDays >= 0 && c.status === 'ativo'
-    }).length,
-    expirados: safeContracts.filter(c => c.status === 'expirado').length
+    gerados: gerados || 0,
+    assinados: assinados || 0,
+    ativos: ativos || 0,
+    vencendo: expiringContracts?.length || 0,
+    expirados: expirados || 0
   }
 
-  const latestContracts = safeContracts.slice(0, 5)
-
   return {
-    statuses,
-    latestContracts
+    statuses
   }
 }
 

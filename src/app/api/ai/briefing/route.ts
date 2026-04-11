@@ -1,94 +1,100 @@
+import { requireAuthWithProfile } from '@/lib/api/auth'
 import { validateOrigin } from '@/lib/csrf'
-import { checkRateLimit, rateLimitResponse, LIMITS } from '@/lib/api/rate-limit'
+import { checkRateLimit, RATE_LIMITS } from '@/lib/api/rate-limit'
 import { sanitizeText } from '@/lib/sanitize'
-import { logger } from '@/lib/logger'
-import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { logAudit } from '@/lib/audit'
+import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 
-export async function POST(request: Request) {
-  if (!validateOrigin(request)) {
-    return new Response(JSON.stringify({ error: 'Origem não permitida' }), { status: 403, headers: { 'Content-Type': 'application/json' } })
+const briefingAiSchema = z.object({
+  briefingData: z.any(),
+})
+
+export async function POST(request: NextRequest) {
+  // 1. Valida origem
+  if (!await validateOrigin()) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
+  // 2. Rate limiting
+  const ip = request.headers.get('x-forwarded-for') ?? 'unknown'
+  const allowed = await checkRateLimit(ip, 'ai-briefing', 10, 60)
+  if (!allowed) {
+    return NextResponse.json(
+      { error: 'Muitas requisições. Aguarde um momento.' },
+      { status: 429 }
+    )
+  }
+
+  // 3. Autenticação
+  const { userId, profile, error } = await requireAuthWithProfile()
+  if (error) return error
+  if (!userId || !profile) {
+    return NextResponse.json({ error: 'Perfil não encontrado' }, { status: 404 })
+  }
+
+  // 4. Lógica protegida (Groq)
   try {
-    const { briefingData, userId } = await request.json()
-
-    if (!userId) {
-      return NextResponse.json({ error: 'User ID is required' }, { status: 400 })
+    const body = await request.json()
+    const parsed = briefingAiSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'Dados inválidos' }, { status: 400 })
     }
 
-    if (!briefingData) {
-      return NextResponse.json({ error: 'Briefing data is required' }, { status: 400 })
-    }
+    const { briefingData } = parsed.data
+    const userName = profile.preferred_name || profile.full_name || 'Profissional'
+    
+    // Log apenas metadados
+    console.log('Chamando Groq (ai-briefing):', {
+      userId,
+      timestamp: new Date().toISOString()
+    })
 
-    const supabase = await createClient()
-    const { data: profile, error } = await supabase
-      .from('profiles')
-      .select('alfred_context, full_name')
-      .eq('id', userId)
-      .single()
-
-    if (error) {
-      console.error('Error fetching profile:', error)
-      return NextResponse.json({ error: 'Failed to fetch user profile' }, { status: 500 })
-    }
-
-    const userName = profile?.full_name || 'usuário'
-    const context = profile?.alfred_context || ''
-
-    const systemPrompt = `Você é o Alfred, Chief of Staff estratégico e braço direito de ${userName}. 
-Sua personalidade e tom de voz devem ser condizentes com o perfil do seu mestre: ${context}.
-
-Com base nos dados de negócio (clientes, contratos, faturas) fornecidos abaixo, gere um briefing diário conciso com no máximo 4 itens prioritários de ação. 
-Para cada item, seja extremamente específico (use nomes reais, valores reais, datas reais). 
-Seu objetivo é dar clareza e direção para ${userName} começar o dia.
-
-REGRAS:
-- Tom executivo, direto e profissional.
-- Retorne apenas a lista de itens prioritários (com marcadores como 1. ou -).
-- Se houver riscos financeiros ou contratos vencendo, priorize-os.`
-
-    const userMessage = `Dados Atuais do Negócio: ${JSON.stringify(briefingData)}`
-
-    const groqApiKey = process.env.GROQ_API_KEY
-    if (!groqApiKey) {
-      return NextResponse.json({ error: 'GROQ API key is missing' }, { status: 500 })
-    }
+    const systemPrompt = `Você é o Alfred, Chief of Staff de ${userName}.
+    Contexto: ${profile.alfred_context || ''}
+    Gere um briefing diário conciso com 4 itens prioritários.
+    Regras: Use nomes, valores e datas reais. Tom executivo.`
 
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${groqApiKey}`,
+        'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         model: 'llama-3.3-70b-versatile',
         messages: [
           { role: 'system', content: systemPrompt },
-          { role: 'user', content: userMessage }
+          { role: 'user', content: `Dados Atuais: ${JSON.stringify(briefingData)}` }
         ],
-        max_tokens: 1024,
-        temperature: 0.5,
+        max_tokens: 800, // Limite para briefing
+        temperature: 0.5
       })
     })
 
     if (!response.ok) {
-      const errorData = await response.text()
-      console.error('Groq API Error:', errorData)
-      return NextResponse.json({ error: 'Failed to fetch response from AI model' }, { status: 500 })
+      return NextResponse.json({ error: 'Erro na IA' }, { status: 500 })
     }
 
     const data = await response.json()
-    const briefingText = data.choices[0]?.message?.content || ''
+    const rawText = data.choices?.[0]?.message?.content || ''
+    const cleanText = sanitizeText(rawText)
 
-    return NextResponse.json({ briefing: briefingText })
+    // 5. Auditoria
+    await logAudit({
+      userId,
+      action: 'briefing_generated',
+      resource: 'briefing',
+      ip,
+      userAgent: request.headers.get('user-agent') || 'unknown'
+    })
 
-  } catch (error: any) {
-    console.error('Unexpected error in AI briefing route:', error)
-    return NextResponse.json({ error: error?.message || 'Internal Server Error' }, { status: 500 })
+    return NextResponse.json({ briefing: cleanText })
+
+  } catch (err) {
+    return NextResponse.json({ error: 'Erro interno' }, { status: 500 })
   }
 }
-
 
 export async function OPTIONS() {
   return new Response(null, { status: 204 })

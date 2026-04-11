@@ -24,8 +24,10 @@ function getServiceClient() {
 export async function getContracts(
   userId: string,
   filters?: ContractFilters
-): Promise<ContractWithClient[]> {
-  const supabase = await createClient()
+): Promise<{ data: ContractWithClient[], count: number }> {
+  const supabase = await createClient();
+  const limit = filters?.limit || 10;
+  const offset = filters?.offset || 0;
 
   let query = supabase
     .from('contracts')
@@ -35,7 +37,7 @@ export async function getContracts(
       client:clients (
         id, user_id, name, type, cpf_cnpj, status, status_manual, email, phone, company_name, cnpj, industry, notes, website, created_at, updated_at, inadimplency_score, alfred_context
       )
-    `)
+    `, { count: 'exact' })
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
 
@@ -57,20 +59,19 @@ export async function getContracts(
     query = query.lte('created_at', filters.dateRange.end)
   }
 
-  if (filters?.limit) {
-    const limit = filters.limit
-    const offset = filters.offset || 0
-    query = query.range(offset, offset + limit - 1)
-  }
+  query = query.range(offset, offset + limit - 1)
 
-  const { data, error } = await query
+  const { data, error, count } = await query
 
   if (error) {
     console.error('Erro ao buscar contratos:', error)
-    return []
+    return { data: [], count: 0 }
   }
 
-  return (data || []) as unknown as ContractWithClient[]
+  return {
+    data: (data || []) as unknown as ContractWithClient[],
+    count: count || 0
+  }
 }
 
 // ─────────────────────────────────────────

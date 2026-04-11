@@ -1,34 +1,59 @@
+import { requireAuth } from '@/lib/api/auth'
 import { validateOrigin } from '@/lib/csrf'
-import { checkRateLimit, rateLimitResponse, LIMITS } from '@/lib/api/rate-limit'
-import { logger } from '@/lib/logger'
-import { NextResponse } from 'next/server';
-import { compareRegimes } from '@/lib/fiscal/tax-calculator';
+import { checkRateLimit, RATE_LIMITS } from '@/lib/api/rate-limit'
+import { logAudit } from '@/lib/audit'
+import { fiscalCalculateSchema } from '@/lib/api/schemas'
+import { compareRegimes } from '@/lib/fiscal/tax-calculator'
+import { NextRequest, NextResponse } from 'next/server'
 
-export async function POST(request: Request) {
-  if (!validateOrigin(request)) {
-    return new Response(JSON.stringify({ error: 'Origem não permitida' }), { status: 403, headers: { 'Content-Type': 'application/json' } })
+export async function POST(request: NextRequest) {
+  // 1. Valida origem
+  if (!await validateOrigin()) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  try {
-    const { monthlyRevenue, annualRevenue, activityType } = await request.json();
+  // 2. Rate limiting
+  const ip = request.headers.get('x-forwarded-for') ?? 'unknown'
+  const allowed = await checkRateLimit(ip, 'fiscal-calculate', RATE_LIMITS['fiscal-calculate'].limit, RATE_LIMITS['fiscal-calculate'].window)
+  if (!allowed) {
+    return NextResponse.json({ error: 'Muitas requisições.' }, { status: 429 })
+  }
 
-    if (!monthlyRevenue) {
-      return NextResponse.json({ error: 'Faturamento mensal é obrigatório' }, { status: 400 });
+  // 3. Autenticação (Opcional se for público, mas o usuário pediu para proteger TODAS as API Routes)
+  const { userId, error } = await requireAuth()
+  if (error) return error
+
+  // 4. Validação do body
+  try {
+    const body = await request.json()
+    const parsed = fiscalCalculateSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'Dados inválidos', details: parsed.error.flatten() }, { status: 400 })
     }
 
-    const results = compareRegimes(
-      Number(monthlyRevenue), 
-      Number(annualRevenue || monthlyRevenue * 12), 
-      activityType || 'Serviços'
-    );
+    const { monthlyRevenue, annualRevenue, activityType } = parsed.data
 
-    return NextResponse.json(results);
-  } catch (error: any) {
-    console.error('Error in fiscal calculation:', error);
-    return NextResponse.json({ error: 'Erro ao calcular impostos' }, { status: 500 });
+    const results = compareRegimes(
+      monthlyRevenue, 
+      annualRevenue || monthlyRevenue * 12, 
+      activityType
+    )
+
+    // 5. Auditoria
+    await logAudit({
+      userId: userId!,
+      action: 'fiscal_calculation_performed',
+      resource: 'fiscal',
+      ip,
+      userAgent: request.headers.get('user-agent') || 'unknown',
+      metadata: { monthlyRevenue, activityType }
+    })
+
+    return NextResponse.json(results)
+  } catch (err) {
+    return NextResponse.json({ error: 'Erro interno' }, { status: 500 })
   }
 }
-
 
 export async function OPTIONS() {
   return new Response(null, { status: 204 })

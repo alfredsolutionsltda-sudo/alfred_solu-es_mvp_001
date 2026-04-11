@@ -1,26 +1,18 @@
-export function validateOrigin(request: Request): boolean {
-  const origin = request.headers.get('origin')
+import { headers } from 'next/headers'
+
+export async function validateOrigin(): Promise<boolean> {
+  const headersList = await headers()
+  const origin = headersList.get('origin')
+  
   const allowedOrigins = [
-    process.env.NEXT_PUBLIC_APP_URL?.trim(),
+    process.env.NEXT_PUBLIC_APP_URL,
     'http://localhost:3000',
     'http://localhost:3001',
-    'http://127.0.0.1:3000',
-    'http://127.0.0.1:3001',
   ].filter(Boolean)
 
-  if (!origin) return true
+  if (origin && !allowedOrigins.includes(origin)) {
+    return false
+  }
   
-  // Verifica se é um domínio oficial, local ou da Vercel
-  const isAllowed = allowedOrigins.some(allowed => 
-    origin === allowed || 
-    origin === allowed?.replace(/\/$/, '')
-  )
-
-  if (isAllowed) return true
-
-  // Permite automaticamente domínios da Vercel para facilitar ambientes de preview
-  if (origin.endsWith('.vercel.app')) return true
-
-  console.warn(`[CSRF] Bloqueando origem não permitida: ${origin}`)
-  return false
+  return true
 }

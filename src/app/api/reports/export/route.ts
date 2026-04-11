@@ -1,26 +1,48 @@
+import { requireAuth } from '@/lib/api/auth'
 import { validateOrigin } from '@/lib/csrf'
-import { checkRateLimit, rateLimitResponse, LIMITS } from '@/lib/api/rate-limit'
-import { logger } from '@/lib/logger'
-import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
-import { getAlfredBriefingData } from '@/lib/data/reports';
-import { ReportPeriod } from '@/types/reports';
+import { checkRateLimit } from '@/lib/api/rate-limit'
+import { logAudit } from '@/lib/audit'
+import { getAlfredBriefingData } from '@/lib/data/reports'
+import { ReportPeriod } from '@/types/reports'
+import { NextRequest, NextResponse } from 'next/server'
 
-export async function GET(req: NextRequest) {
+export async function GET(request: NextRequest) {
+  // 1. Valida origem
+  if (!await validateOrigin()) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  // 2. Rate limiting (Estrito: 10 por hora para exportação)
+  const ip = request.headers.get('x-forwarded-for') ?? 'unknown'
+  const allowed = await checkRateLimit(ip, 'report-export', 10, 3600)
+  if (!allowed) {
+    return NextResponse.json(
+      { error: 'Muitos exports. Tente novamente mais tarde.' },
+      { status: 429 }
+    )
+  }
+
+  // 3. Autenticação
+  const { userId, error } = await requireAuth()
+  if (error) return error
+
+  // 4. Lógica protegida
   try {
-    const supabase = await createClient();
-    const { data: { session } } = await supabase.auth.getSession();
+    const { searchParams } = new URL(request.url)
+    const period = (searchParams.get('period') as ReportPeriod) || 'month'
+    const format = searchParams.get('format') || 'csv'
 
-    if (!session) {
-      return new NextResponse('Unauthorized', { status: 401 });
-    }
+    const data = await getAlfredBriefingData(userId!, period)
 
-    const { searchParams } = new URL(req.url);
-    const period = (searchParams.get('period') as ReportPeriod) || 'month';
-    const format = searchParams.get('format') || 'csv';
-    const userId = session.user.id;
-
-    const data = await getAlfredBriefingData(userId, period);
+    // 5. Auditoria
+    await logAudit({
+      userId: userId!,
+      action: 'report_exported',
+      resource: 'reports',
+      ip,
+      userAgent: request.headers.get('user-agent') || 'unknown',
+      metadata: { period, format }
+    })
 
     if (format === 'csv') {
       const csvRows = [
@@ -36,18 +58,21 @@ export async function GET(req: NextRequest) {
         [],
         ['Performance por Cliente', 'Volume', 'Pontualidade (%)'],
         ...data.clients.map(c => [c.clientName, c.volume, `${c.punctuality.toFixed(2)}%`]),
-      ];
+      ]
 
-      const csvContent = csvRows.map(row => row.join(',')).join('\n');
-      const response = new NextResponse(csvContent);
-      response.headers.set('Content-Type', 'text/csv; charset=utf-8');
-      response.headers.set('Content-Disposition', `attachment; filename="relatorio_alfred_${period}_${new Date().toISOString().slice(0, 10)}.csv"`);
-      return response;
+      const csvContent = csvRows.map(row => row.join(',')).join('\n')
+      const response = new NextResponse(csvContent)
+      response.headers.set('Content-Type', 'text/csv; charset=utf-8')
+      response.headers.set('Content-Disposition', `attachment; filename="relatorio_alfred_${period}_${new Date().toISOString().slice(0, 10)}.csv"`)
+      return response
     }
 
-    return NextResponse.json(data);
-  } catch (error) {
-    console.error('Error exporting report:', error);
-    return new NextResponse('Internal Server Error', { status: 500 });
+    return NextResponse.json(data)
+  } catch (err) {
+    return NextResponse.json({ error: 'Erro interno na exportação' }, { status: 500 })
   }
+}
+
+export async function OPTIONS() {
+  return new Response(null, { status: 204 })
 }

@@ -1,35 +1,37 @@
-import { useEffect, useCallback, useState } from 'react'
+import { useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
+import { clearSensitiveData } from '@/lib/cleanup'
 
-export function useInactivityLogout(timeoutMinutes = 60) {
+export function useInactivityLogout(
+  timeoutMinutes = 60
+) {
   const router = useRouter()
   const supabase = createClient()
-  // Utilizando estado para guardar o timeout para não estourar em ambientes SSR
-  const [active, setActive] = useState(true)
 
   const logout = useCallback(async () => {
-    setActive(false)
     await supabase.auth.signOut()
+    clearSensitiveData()
     router.push('/login?reason=inactivity')
   }, [supabase, router])
 
   useEffect(() => {
-    if (!active) return;
     let timer: ReturnType<typeof setTimeout>
-    
-    const reset = () => {
+
+    const resetTimer = () => {
       clearTimeout(timer)
       timer = setTimeout(logout, timeoutMinutes * 60 * 1000)
     }
-    
+
     const events = ['mousedown', 'keydown', 'scroll', 'touchstart']
-    events.forEach(e => window.addEventListener(e, reset))
-    reset()
-    
+    const handleEvent = () => resetTimer()
+
+    events.forEach(e => window.addEventListener(e, handleEvent))
+    resetTimer()
+
     return () => {
       clearTimeout(timer)
-      events.forEach(e => window.removeEventListener(e, reset))
+      events.forEach(e => window.removeEventListener(e, handleEvent))
     }
-  }, [logout, timeoutMinutes, active])
+  }, [logout, timeoutMinutes])
 }

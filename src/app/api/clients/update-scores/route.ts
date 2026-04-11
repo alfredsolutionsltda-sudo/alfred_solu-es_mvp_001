@@ -1,30 +1,52 @@
+import { requireAuth } from '@/lib/api/auth'
 import { validateOrigin } from '@/lib/csrf'
-import { checkRateLimit, rateLimitResponse, LIMITS } from '@/lib/api/rate-limit'
-import { logger } from '@/lib/logger'
-import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { checkRateLimit } from '@/lib/api/rate-limit'
+import { logAudit } from '@/lib/audit'
+import { createClient } from '@/lib/supabase/server'
+import { NextRequest, NextResponse } from 'next/server'
 
-export async function GET(req: Request) {
+export async function GET(request: NextRequest) {
+  // 1. Valida origem
+  if (!await validateOrigin()) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  // 2. Rate limiting
+  const ip = request.headers.get('x-forwarded-for') ?? 'unknown'
+  const allowed = await checkRateLimit(ip, 'clients-update-scores', 10, 3600)
+  if (!allowed) {
+    return NextResponse.json({ error: 'Muitas requisições.' }, { status: 429 })
+  }
+
+  // 3. Autenticação
+  const { userId, error } = await requireAuth()
+  if (error) return error
+
+  // 4. Lógica protegida
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
-    }
-
-    // Chama a nova função RPC de performance que processa tudo no banco de dados em lote
+    const supabase = await createClient()
     const { error: rpcError } = await supabase
-      .rpc('fn_update_all_client_scores', { p_user_id: user.id });
+      .rpc('fn_update_all_client_scores', { p_user_id: userId })
     
     if (rpcError) {
-      console.error('RPC Performance Error:', rpcError);
-      return NextResponse.json({ error: rpcError.message }, { status: 500 });
+      return NextResponse.json({ error: 'Erro ao processar scores' }, { status: 500 })
     }
 
-    return NextResponse.json({ success: true, message: 'Scores e status atualizados com sucesso via batch processing.' });
-  } catch (err: any) {
-    console.error('API update-scores crash:', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    // 5. Auditoria
+    await logAudit({
+      userId: userId!,
+      action: 'clients_scores_updated',
+      resource: 'clients',
+      ip,
+      userAgent: request.headers.get('user-agent') || 'unknown'
+    })
+
+    return NextResponse.json({ success: true, message: 'Scores atualizados.' })
+  } catch (err) {
+    return NextResponse.json({ error: 'Erro interno' }, { status: 500 })
   }
+}
+
+export async function OPTIONS() {
+  return new Response(null, { status: 204 })
 }

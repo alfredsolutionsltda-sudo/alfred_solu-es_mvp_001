@@ -1,62 +1,65 @@
+import { requireAuth } from '@/lib/api/auth'
 import { validateOrigin } from '@/lib/csrf'
-import { checkRateLimit, rateLimitResponse, LIMITS } from '@/lib/api/rate-limit'
-import { logger } from '@/lib/logger'
-import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
-import { importClientsFromCSV } from '@/lib/data/clients';
-import Papa from 'papaparse';
-import { ClientFormData } from '@/types/clients';
+import { checkRateLimit } from '@/lib/api/rate-limit'
+import { logAudit } from '@/lib/audit'
+import { importClientsFromCSV } from '@/lib/data/clients'
+import { NextRequest, NextResponse } from 'next/server'
+import Papa from 'papaparse'
 
-export async function POST(req: Request) {
+export async function POST(request: NextRequest) {
+  // 1. Valida origem
+  if (!await validateOrigin()) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  // 2. Rate limiting (Estrito: 3 por hora para importação)
+  const ip = request.headers.get('x-forwarded-for') ?? 'unknown'
+  const allowed = await checkRateLimit(ip, 'client-import', 3, 3600)
+  if (!allowed) {
+    return NextResponse.json(
+      { error: 'Muitas importações. Limite de 3 por hora.' },
+      { status: 429 }
+    )
+  }
+
+  // 3. Autenticação
+  const { userId, error } = await requireAuth()
+  if (error) return error
+
+  // 4. Lógica de importação
   try {
-    const formData = await req.formData();
-    const file = formData.get('file') as File;
+    const formData = await request.formData()
+    const file = formData.get('file') as File
     if (!file) {
-      return NextResponse.json({ error: 'Nenhum arquivo enviado' }, { status: 400 });
+      return NextResponse.json({ error: 'Nenhum arquivo enviado' }, { status: 400 })
     }
 
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
-    }
-
-    const text = await file.text();
-    const result = Papa.parse(text, { header: true, skipEmptyLines: true });
+    const text = await file.text()
+    const result = Papa.parse(text, { header: true, skipEmptyLines: true })
     
     if (result.errors.length > 0) {
-      return NextResponse.json({ error: 'Erro ao parsear CSV' }, { status: 400 });
+      return NextResponse.json({ error: 'Erro ao parsear CSV' }, { status: 400 })
     }
 
-    const rows: ClientFormData[] = result.data.map((row: any) => {
-      let tipo: 'pessoa_fisica' | 'pessoa_juridica' = 'pessoa_fisica';
-      if (row.tipo && row.tipo.toLowerCase().includes('juridica')) {
-        tipo = 'pessoa_juridica';
-      } else if (row.documento && row.documento.length > 14) {
-        tipo = 'pessoa_juridica';
-      }
+    const rows = result.data as any[]
+    const importResult = await importClientsFromCSV(userId!, rows)
 
-      const profAndEst = `Profissão/Segmento: ${row.profissao || ''}\nEstado: ${row.estado || ''}`;
+    // 5. Auditoria
+    await logAudit({
+      userId: userId!,
+      action: 'clients_imported',
+      resource: 'clients',
+      ip,
+      userAgent: request.headers.get('user-agent') || 'unknown',
+      metadata: { count: rows.length }
+    })
 
-      return {
-        name: row.nome || 'Sem Nome',
-        cpf_cnpj: row.documento || null,
-        email: row.email || null,
-        phone: row.telefone || null,
-        type: tipo,
-        notes: profAndEst,
-      };
-    });
+    return NextResponse.json(importResult)
 
-    const importResult = await importClientsFromCSV(user.id, rows);
-    return NextResponse.json(importResult);
-
-  } catch (e: any) {
-    return NextResponse.json({ error: e.message }, { status: 500 });
+  } catch (err) {
+    return NextResponse.json({ error: 'Erro interno na importação' }, { status: 500 })
   }
 }
-
 
 export async function OPTIONS() {
   return new Response(null, { status: 204 })

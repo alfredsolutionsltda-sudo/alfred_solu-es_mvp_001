@@ -7,7 +7,7 @@ import { Resend } from 'resend'
 import { buildUrl } from '@/lib/url'
 
 export async function POST(request: Request) {
-  if (!validateOrigin(request)) {
+  if (!await await validateOrigin()) {
     return new Response(JSON.stringify({ error: 'Origem não permitida' }), { status: 403, headers: { 'Content-Type': 'application/json' } })
   }
 

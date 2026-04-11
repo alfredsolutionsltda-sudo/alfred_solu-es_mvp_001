@@ -11,6 +11,7 @@ export async function logAudit(data: {
   resource: string
   resourceId?: string
   ip?: string
+  userAgent?: string
   metadata?: Record<string, unknown>
 }) {
   try {
@@ -20,9 +21,10 @@ export async function logAudit(data: {
       resource: data.resource,
       resource_id: data.resourceId,
       ip_address: data.ip,
+      user_agent: data.userAgent,
       metadata: data.metadata,
     })
   } catch {
-    // Não interrompe o fluxo principal
+    // Não interrompe o fluxo se o log falhar
   }
 }

@@ -1,130 +1,104 @@
+import { requireAuthWithProfile } from '@/lib/api/auth'
 import { validateOrigin } from '@/lib/csrf'
-import { checkRateLimit, rateLimitResponse, LIMITS } from '@/lib/api/rate-limit'
-import { logger } from '@/lib/logger'
-import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
-import { getDashboardMetrics, getContractsWidget } from '@/lib/data/dashboard';
-import { rateLimit } from '@/lib/rate-limit';
-
-import { z } from 'zod';
+import { checkRateLimit, RATE_LIMITS } from '@/lib/api/rate-limit'
+import { sanitizeText } from '@/lib/sanitize'
+import { logAudit } from '@/lib/audit'
+import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 
 const chatSchema = z.object({
-  message: z.string().min(1),
-  history: z.array(z.object({
+  messages: z.array(z.object({
     role: z.enum(['user', 'assistant', 'system']),
-    content: z.string(),
-  })).optional(),
-});
+    content: z.string().max(2000)
+  })),
+})
 
 export async function POST(request: NextRequest) {
-  if (!validateOrigin(request)) {
-    return new Response(JSON.stringify({ error: 'Origem não permitida' }), { status: 403, headers: { 'Content-Type': 'application/json' } })
+  // 1. Valida origem
+  if (!await validateOrigin()) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  const ip = request.headers.get('x-forwarded-for') || 'unknown';
-  
-  if (!rateLimit(ip, 20)) {
-    return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
+  // 2. Rate limiting
+  const ip = request.headers.get('x-forwarded-for') ?? 'unknown'
+  const allowed = await checkRateLimit(ip, 'ai-chat', RATE_LIMITS['ai-chat'].limit, RATE_LIMITS['ai-chat'].window)
+  if (!allowed) {
+    return NextResponse.json(
+      { error: 'Muitas requisições. Aguarde um momento.' },
+      { status: 429 }
+    )
   }
 
+  // 3. Autenticação
+  const { userId, profile, error } = await requireAuthWithProfile()
+  if (error) return error
+  if (!userId || !profile) {
+    return NextResponse.json({ error: 'Perfil não encontrado' }, { status: 404 })
+  }
+
+  // 4. Validação do body
   try {
-    const body = await request.json();
-    const result = chatSchema.safeParse(body);
+    const body = await request.json()
+    const parsed = chatSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'Dados inválidos' }, { status: 400 })
+    }
+
+    const { messages } = parsed.data
     
-    if (!result.success) {
-      return NextResponse.json({ error: 'Invalid request body', details: result.error.format() }, { status: 400 });
-    }
+    // Log apenas metadados
+    console.log('Chamando Groq (ai-chat):', {
+      userId,
+      messageCount: messages.length,
+      timestamp: new Date().toISOString()
+    })
 
-    const { message, history } = result.data;
-
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
-    }
-
-    // Busca contexto real do usuário — Otimizado select
-    const [profile, metrics, contractsData] = await Promise.all([
-      supabase.from('profiles').select('full_name, alfred_context').eq('id', user.id).single(),
-      getDashboardMetrics(user.id, 'mes'),
-      getContractsWidget(user.id, 'mes')
-    ]);
-
-    const alfredContext = profile.data?.alfred_context || '';
-    const profName = profile.data?.full_name || 'Profissional';
-    
-    // Constrói um resumo do negócio para a IA
-    const businessSummary = `
-      - Contratos Ativos: ${metrics.activeContracts}
-      - Clientes Ativos: ${metrics.clientesAtivos}
-      - Faturamento Mensal: R$ ${metrics.faturamentoPeriodo.toLocaleString('pt-BR')}
-      - Contratos Recentes: ${contractsData.latestContracts.map(c => c.title).join(', ') || 'Nenhum'}
-      - Inadimplência Atual: R$ ${metrics.inadimplenciaTotal.toLocaleString('pt-BR')}
-    `;
-
-    const systemPrompt = `Você é o Alfred, assistente pessoal e estratégico de alto nível de ${profName}.
-Contexto do seu mestre: ${alfredContext}
-
-DADOS ATUAIS DO NEGÓCIO:
-${businessSummary}
-
-Sua missão é ajudar ${profName} a gerir o negócio dele da forma mais eficiente possível.
-Você tem acesso total aos dados acima para responder perguntas estratégicas.
-
-REGRAS:
-- Seja extremamente executivo, direto e útil.
-- Responda em Português do Brasil.
-- Se solicitado para analisar algo, use os DADOS ATUAIS fornecidos acima.
-- Se não souber algo, admita, mas tente sugerir uma ação prática baseada nos dados.`;
-
-    const groqApiKey = process.env.GROQ_API_KEY;
-    if (!groqApiKey) {
-      console.error('GROQ_API_KEY is missing');
-      return NextResponse.json({ reply: 'Desculpe, meu módulo de inteligência está offline no momento.' });
-    }
-
-    const messages = [
-      { role: 'system', content: systemPrompt },
-      ...(history || []),
-      { role: 'user', content: message }
-    ];
+    const systemPrompt = profile.alfred_context || "Você é o Alfred, assistente pessoal e estratégico."
 
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${groqApiKey}`,
+        'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         model: 'llama-3.3-70b-versatile',
-        messages,
-        temperature: 0.6,
-      }),
-    });
+        messages: [
+          { role: 'system', content: systemPrompt },
+          ...messages
+        ],
+        max_tokens: 500, // Limite para chat
+        temperature: 0.7
+      })
+    })
 
     if (!response.ok) {
-      const errorData = await response.json();
-      console.error('Groq API Error:', errorData);
-      return NextResponse.json({ reply: 'Tive um problema ao processar sua resposta. Pode tentar novamente?' });
+      return NextResponse.json({ error: 'Erro na IA' }, { status: 500 })
     }
 
-    const data = await response.json();
-    const reply = data.choices?.[0]?.message?.content;
+    const data = await response.json()
+    const rawContent = data.choices?.[0]?.message?.content || ''
+    const cleanContent = sanitizeText(rawContent)
 
-    if (!reply) {
-      console.error('Empty reply from Groq:', data);
-      return NextResponse.json({ reply: 'Não consegui formular uma resposta agora. Vamos tentar de outra forma?' });
-    }
+    // 5. Auditoria
+    await logAudit({
+      userId,
+      action: 'chat_message_sent',
+      resource: 'ai',
+      ip,
+      userAgent: request.headers.get('user-agent') || 'unknown'
+    })
 
-    return NextResponse.json({ reply });
-  } catch (error) {
-    console.error('Chat Route Error:', error);
-    return NextResponse.json({ reply: 'Erro interno ao falar com o Alfred. Verifique sua conexão.' });
+    return NextResponse.json({ 
+      choices: [{ message: { content: cleanContent } }],
+      model: data.model,
+      usage: data.usage
+    })
+
+  } catch (err) {
+    return NextResponse.json({ error: 'Erro interno' }, { status: 500 })
   }
 }
-
-
 
 export async function OPTIONS() {
   return new Response(null, { status: 204 })

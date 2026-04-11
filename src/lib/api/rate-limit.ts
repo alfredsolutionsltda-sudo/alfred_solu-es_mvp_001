@@ -1,5 +1,3 @@
-import { NextResponse } from 'next/server'
-
 interface RateLimitEntry {
   count: number
   resetAt: number
@@ -7,60 +5,54 @@ interface RateLimitEntry {
 
 const store = new Map<string, RateLimitEntry>()
 
-export function checkRateLimit(
-  ip: string,
+export async function checkRateLimit(
+  identifier: string,
   action: string,
   limit: number,
   windowSeconds: number
-): { allowed: boolean; remaining: number; resetAt: number } {
-  const key = `${action}:${ip}`
+): Promise<boolean> {
+  const key = `${action}:${identifier}`
   const now = Date.now()
   const windowMs = windowSeconds * 1000
+
   const entry = store.get(key)
 
   if (!entry || now > entry.resetAt) {
     store.set(key, { count: 1, resetAt: now + windowMs })
-    return { allowed: true, remaining: limit - 1, resetAt: now + windowMs }
+    return true
   }
 
   if (entry.count >= limit) {
-    return { allowed: false, remaining: 0, resetAt: entry.resetAt }
+    return false
   }
 
   entry.count++
-  return { 
-    allowed: true, 
-    remaining: limit - entry.count, 
-    resetAt: entry.resetAt 
-  }
+  return true
 }
 
-export const LIMITS = {
-  'ai-generate':        { limit: 10,  window: 60  },
-  'ai-chat':            { limit: 30,  window: 60  },
-  'proposals-accept':   { limit: 5,   window: 300 },
-  'proposals-refuse':   { limit: 5,   window: 300 },
-  'contract-sign':      { limit: 5,   window: 300 },
-  'fiscal-calculate':   { limit: 30,  window: 60  },
-  'client-import':      { limit: 3,   window: 3600 },
-  'auth-login':         { limit: 10,  window: 900 },
-  'auth-signup':        { limit: 3,   window: 3600 },
-  'context-regenerate': { limit: 5,   window: 3600 },
-  'report-export':      { limit: 10,  window: 3600 },
+// Limites por endpoint:
+export const RATE_LIMITS = {
+  'ai-contracts': { limit: 10, window: 60 },
+  'ai-proposals': { limit: 10, window: 60 },
+  'ai-fiscal': { limit: 20, window: 60 },
+  'ai-reports': { limit: 10, window: 60 },
+  'ai-chat': { limit: 30, window: 60 },
+  'proposals-accept': { limit: 5, window: 300 },
+  'proposals-refuse': { limit: 5, window: 300 },
+  'fiscal-calculate': { limit: 30, window: 60 },
+  'auth-login': { limit: 10, window: 900 }, // 15min
+  'auth-signup': { limit: 3, window: 3600 }, // 1h
 }
 
-export function rateLimitResponse(resetAt: number) {
-  const retryAfter = Math.ceil((resetAt - Date.now()) / 1000)
-  return NextResponse.json(
-    { error: 'Muitas requisições. Tente novamente em breve.' },
-    {
-      status: 429,
-      headers: {
-        'Retry-After': String(retryAfter),
-        'X-RateLimit-Limit': '0',
-        'X-RateLimit-Remaining': '0',
-        'X-RateLimit-Reset': String(Math.ceil(resetAt / 1000)),
-      },
-    }
-  )
+// Aliases para compatibilidade com rotas legadas
+export const LIMITS = RATE_LIMITS;
+export { createNextResponse as rateLimitResponse };
+
+function createNextResponse() {
+  return (import('next/server')).then(mod => 
+    mod.NextResponse.json(
+      { error: 'Muitas requisições. Aguarde um momento.' },
+      { status: 429 }
+    )
+  );
 }

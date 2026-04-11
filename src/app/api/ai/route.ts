@@ -6,7 +6,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 
 export async function POST(request: Request) {
-  if (!validateOrigin(request)) {
+  if (!await await validateOrigin()) {
     console.error('CSRF Validation failed for origin:', request.headers.get('origin'));
     return new Response(JSON.stringify({ error: 'Origem não permitida' }), { status: 403, headers: { 'Content-Type': 'application/json' } })
   }

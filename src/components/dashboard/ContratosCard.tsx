@@ -11,7 +11,6 @@ type ContratosWidgetData = {
     vencendo: number
     expirados: number
   }
-  latestContracts: Contract[]
 }
 
 export default function ContratosCard({ data }: { data: ContratosWidgetData }) {

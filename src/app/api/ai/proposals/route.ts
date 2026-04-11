@@ -1,18 +1,10 @@
 import { requireAuthWithProfile } from '@/lib/api/auth'
+import { createProposalSchema } from '@/lib/api/schemas'
 import { validateOrigin } from '@/lib/csrf'
 import { checkRateLimit, RATE_LIMITS } from '@/lib/api/rate-limit'
 import { sanitizeText } from '@/lib/sanitize'
 import { logAudit } from '@/lib/audit'
 import { NextRequest, NextResponse } from 'next/server'
-import { z } from 'zod'
-
-const reportsChatSchema = z.object({
-  messages: z.array(z.object({
-    role: z.enum(['user', 'assistant', 'system']),
-    content: z.string().max(2000)
-  })),
-  metricsData: z.any().optional(),
-})
 
 export async function POST(request: NextRequest) {
   // 1. Valida origem
@@ -22,7 +14,7 @@ export async function POST(request: NextRequest) {
 
   // 2. Rate limiting
   const ip = request.headers.get('x-forwarded-for') ?? 'unknown'
-  const allowed = await checkRateLimit(ip, 'ai-chat', RATE_LIMITS['ai-chat'].limit, RATE_LIMITS['ai-chat'].window)
+  const allowed = await checkRateLimit(ip, 'ai-proposals', RATE_LIMITS['ai-proposals'].limit, RATE_LIMITS['ai-proposals'].window)
   if (!allowed) {
     return NextResponse.json(
       { error: 'Muitas requisições. Aguarde um momento.' },
@@ -30,7 +22,7 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  // 3. Autenticação
+  // 3. Autenticação e Perfil
   const { userId, profile, error } = await requireAuthWithProfile()
   if (error) return error
   if (!userId || !profile) {
@@ -40,28 +32,31 @@ export async function POST(request: NextRequest) {
   // 4. Validação do body
   try {
     const body = await request.json()
-    const parsed = reportsChatSchema.safeParse(body)
+    const parsed = createProposalSchema.safeParse(body)
     if (!parsed.success) {
-      return NextResponse.json({ error: 'Dados inválidos' }, { status: 400 })
+      return NextResponse.json(
+        { error: 'Dados inválidos', details: parsed.error.flatten() },
+        { status: 400 }
+      )
     }
 
-    const { messages, metricsData } = parsed.data
+    const { clientName, serviceType, value, deliverables, timeline, paymentTerms } = parsed.data
 
-    // 5. Lógica protegida (Groq)
-    const name = profile.preferred_name || 'Profissional'
+    // 5. Preparação segura do prompt
+    const alfredContext = profile.alfred_context || ''
+    const professionalName = profile.preferred_name || 'Profissional'
     
     // Log apenas metadados
-    console.log('Chamando Groq (ai-reports-chat):', {
+    console.log('Chamando Groq (ai-proposals):', {
       userId,
-      messageCount: messages.length,
       timestamp: new Date().toISOString()
     })
 
-    const systemPrompt = `Você é o Alfred, Chief of Staff de ${name}.
-    Contexto: ${profile.alfred_context || ''}
-    Sessão de chat estratégico sobre relatórios.
-    Dados reais: ${JSON.stringify(metricsData || {})}
-    Regras: Responda sobre os números, Máximo 2-3 frases.`
+    const systemPrompt = `Você é o Alfred, estrategista comercial.
+    Gere uma proposta comercial para o profissional ${professionalName}.
+    Contexto: ${alfredContext}
+    Regras: Texto persuasivo, claro e profissional. Sem placeholders.
+    Dados: Cliente ${clientName}, Serviço ${serviceType}, Valor R$ ${value}, Entregáveis: ${deliverables}.`
 
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
@@ -73,10 +68,10 @@ export async function POST(request: NextRequest) {
         model: 'llama-3.3-70b-versatile',
         messages: [
           { role: 'system', content: systemPrompt },
-          ...messages
+          { role: 'user', content: 'Gere a proposta comercial estruturada.' }
         ],
-        max_tokens: 500, // Limite para chat
-        temperature: 0.7
+        max_tokens: 1500,
+        temperature: 0.4
       })
     })
 
@@ -85,19 +80,20 @@ export async function POST(request: NextRequest) {
     }
 
     const data = await response.json()
-    const rawMessage = data.choices?.[0]?.message?.content || ''
-    const cleanMessage = sanitizeText(rawMessage)
+    const rawText = data.choices?.[0]?.message?.content || ''
+    const cleanText = sanitizeText(rawText)
 
-    // 6. Auditoria (Opcional para chat, mas bom para debug de uso)
+    // 6. Auditoria
     await logAudit({
       userId,
-      action: 'report_chat_message',
-      resource: 'reports',
+      action: 'proposal_generated',
+      resource: 'proposals',
       ip,
-      userAgent: request.headers.get('user-agent') || 'unknown'
+      userAgent: request.headers.get('user-agent') || 'unknown',
+      metadata: { clientName, serviceType }
     })
 
-    return NextResponse.json({ message: cleanMessage })
+    return NextResponse.json({ proposalText: cleanText })
 
   } catch (err) {
     return NextResponse.json({ error: 'Erro interno' }, { status: 500 })

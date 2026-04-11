@@ -8,6 +8,7 @@ import ContractTable from '@/components/contracts/ContractTable'
 import { Plus, AlertTriangle, Bell, Info, ArrowRight, Loader2 } from 'lucide-react'
 import { getContractAlertsAction } from '@/app/actions/contractActions'
 import Link from 'next/link'
+import PaginationControl from '../PaginationControl'
 
 const ContractDrawer = dynamic(() => import('@/components/contracts/ContractDrawer'), {
   loading: () => <div className="fixed inset-y-0 right-0 w-full md:w-[640px] bg-white animate-pulse" />
@@ -30,6 +31,9 @@ interface ContractsClientProps {
   userId: string
   clients: Client[]
   mode?: 'contracts' | 'proposals'
+  totalCount: number
+  currentPage: number
+  pageSize: number
 }
 
 export default function ContractsClient({
@@ -38,6 +42,9 @@ export default function ContractsClient({
   userId,
   clients,
   mode = 'contracts',
+  totalCount,
+  currentPage,
+  pageSize
 }: ContractsClientProps) {
   const [selectedContract, setSelectedContract] = useState<ContractWithClient | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
@@ -176,6 +183,12 @@ export default function ContractsClient({
           onSelectContract={handleSelectContract}
           selectedContractId={selectedContract?.id}
           mode={mode}
+        />
+        
+        <PaginationControl 
+          totalItems={totalCount} 
+          pageSize={pageSize} 
+          currentPage={currentPage} 
         />
       </div>
 

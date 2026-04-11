@@ -7,7 +7,7 @@ import { checkRateLimit, rateLimitResponse, LIMITS } from '@/lib/api/rate-limit'
 import { logger } from '@/lib/logger'
 
 export async function POST(request: Request) {
-  if (!validateOrigin(request)) {
+  if (!await await validateOrigin()) {
     return new Response(JSON.stringify({ error: 'Origem não permitida' }), { status: 403, headers: { 'Content-Type': 'application/json' } })
   }
 

@@ -1,17 +1,15 @@
 import { requireAuthWithProfile } from '@/lib/api/auth'
 import { validateOrigin } from '@/lib/csrf'
-import { checkRateLimit, RATE_LIMITS } from '@/lib/api/rate-limit'
+import { checkRateLimit } from '@/lib/api/rate-limit'
 import { sanitizeText } from '@/lib/sanitize'
 import { logAudit } from '@/lib/audit'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 
-const reportsChatSchema = z.object({
-  messages: z.array(z.object({
-    role: z.enum(['user', 'assistant', 'system']),
-    content: z.string().max(2000)
-  })),
-  metricsData: z.any().optional(),
+const followupSchema = z.object({
+  proposalId: z.string().uuid(),
+  clientName: z.string().min(2),
+  lastContactDate: z.string().optional(),
 })
 
 export async function POST(request: NextRequest) {
@@ -22,12 +20,9 @@ export async function POST(request: NextRequest) {
 
   // 2. Rate limiting
   const ip = request.headers.get('x-forwarded-for') ?? 'unknown'
-  const allowed = await checkRateLimit(ip, 'ai-chat', RATE_LIMITS['ai-chat'].limit, RATE_LIMITS['ai-chat'].window)
+  const allowed = await checkRateLimit(ip, 'proposals-followup', 10, 60)
   if (!allowed) {
-    return NextResponse.json(
-      { error: 'Muitas requisições. Aguarde um momento.' },
-      { status: 429 }
-    )
+    return NextResponse.json({ error: 'Muitas requisições.' }, { status: 429 })
   }
 
   // 3. Autenticação
@@ -37,31 +32,27 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Perfil não encontrado' }, { status: 404 })
   }
 
-  // 4. Validação do body
+  // 4. Lógica protegida (Groq)
   try {
     const body = await request.json()
-    const parsed = reportsChatSchema.safeParse(body)
+    const parsed = followupSchema.safeParse(body)
     if (!parsed.success) {
       return NextResponse.json({ error: 'Dados inválidos' }, { status: 400 })
     }
 
-    const { messages, metricsData } = parsed.data
-
-    // 5. Lógica protegida (Groq)
-    const name = profile.preferred_name || 'Profissional'
+    const { clientName, proposalId } = parsed.data
     
     // Log apenas metadados
-    console.log('Chamando Groq (ai-reports-chat):', {
+    console.log('Chamando Groq (proposals-followup):', {
       userId,
-      messageCount: messages.length,
+      proposalId,
       timestamp: new Date().toISOString()
     })
 
-    const systemPrompt = `Você é o Alfred, Chief of Staff de ${name}.
-    Contexto: ${profile.alfred_context || ''}
-    Sessão de chat estratégico sobre relatórios.
-    Dados reais: ${JSON.stringify(metricsData || {})}
-    Regras: Responda sobre os números, Máximo 2-3 frases.`
+    const systemPrompt = `Você é o Alfred, assistente comercial.
+    Gere uma mensagem de acompanhamento (follow-up) educada e profissional para o cliente ${clientName}.
+    Contexto do mestre: ${profile.alfred_context || ''}
+    Regras: Curta, gentil e direta. Máximo 3 frases.`
 
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
@@ -73,10 +64,10 @@ export async function POST(request: NextRequest) {
         model: 'llama-3.3-70b-versatile',
         messages: [
           { role: 'system', content: systemPrompt },
-          ...messages
+          { role: 'user', content: `Gere a mensagem de follow-up para a proposta ${proposalId}.` }
         ],
-        max_tokens: 500, // Limite para chat
-        temperature: 0.7
+        max_tokens: 300,
+        temperature: 0.5
       })
     })
 
@@ -85,19 +76,20 @@ export async function POST(request: NextRequest) {
     }
 
     const data = await response.json()
-    const rawMessage = data.choices?.[0]?.message?.content || ''
-    const cleanMessage = sanitizeText(rawMessage)
+    const rawText = data.choices?.[0]?.message?.content || ''
+    const cleanText = sanitizeText(rawText)
 
-    // 6. Auditoria (Opcional para chat, mas bom para debug de uso)
+    // 5. Auditoria
     await logAudit({
       userId,
-      action: 'report_chat_message',
-      resource: 'reports',
+      action: 'proposal_followup_generated',
+      resource: 'proposals',
+      resourceId: proposalId,
       ip,
       userAgent: request.headers.get('user-agent') || 'unknown'
     })
 
-    return NextResponse.json({ message: cleanMessage })
+    return NextResponse.json({ followupText: cleanText })
 
   } catch (err) {
     return NextResponse.json({ error: 'Erro interno' }, { status: 500 })

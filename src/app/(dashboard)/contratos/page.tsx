@@ -9,7 +9,14 @@ export const metadata = {
   description: 'Gerencie seus contratos de prestação de serviços com IA.',
 }
 
-export default async function ContratosPage() {
+export default async function ContratosPage(props: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
+}) {
+  const searchParams = await props.searchParams;
+  const page = Number(searchParams.page) || 1;
+  const pageSize = 10;
+  const offset = (page - 1) * pageSize;
+
   const supabase = await createClient()
 
   const {
@@ -28,19 +35,22 @@ export default async function ContratosPage() {
   }
 
   // Busca dados em paralelo
-  const [contracts, metrics, clients] = await Promise.all([
-    getContracts(user.id),
+  const [contractsResult, metrics, clients] = await Promise.all([
+    getContracts(user.id, { limit: pageSize, offset }),
     getContractMetrics(user.id),
     getUserClients(user.id),
   ])
 
   return (
     <ContractsClient
-      contracts={contracts}
+      contracts={contractsResult.data}
       metrics={metrics}
       userId={user.id}
       clients={clients}
       mode="contracts"
+      totalCount={contractsResult.count}
+      currentPage={page}
+      pageSize={pageSize}
     />
   )
 }

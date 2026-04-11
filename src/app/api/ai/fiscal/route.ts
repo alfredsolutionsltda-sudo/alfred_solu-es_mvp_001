@@ -1,112 +1,105 @@
+import { requireAuthWithProfile } from '@/lib/api/auth'
 import { validateOrigin } from '@/lib/csrf'
-import { checkRateLimit, rateLimitResponse, LIMITS } from '@/lib/api/rate-limit'
+import { checkRateLimit, RATE_LIMITS } from '@/lib/api/rate-limit'
 import { sanitizeText } from '@/lib/sanitize'
-import { logger } from '@/lib/logger'
-import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
-import { getFiscalMetrics } from '@/lib/data/fiscal';
-import { rateLimit } from '@/lib/rate-limit';
-import { z } from 'zod';
+import { logAudit } from '@/lib/audit'
+import { getFiscalMetrics } from '@/lib/data/fiscal'
+import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 
-const fiscalSchema = z.object({
-  userId: z.string().uuid(),
-  question: z.string().optional(),
-  context: z.any().optional(),
-});
+const fiscalAiSchema = z.object({
+  question: z.string().max(1000).trim().optional(),
+})
 
 export async function POST(request: NextRequest) {
-  if (!validateOrigin(request)) {
-    return new Response(JSON.stringify({ error: 'Origem não permitida' }), { status: 403, headers: { 'Content-Type': 'application/json' } })
+  // 1. Valida origem
+  if (!await validateOrigin()) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  const ip = request.headers.get('x-forwarded-for') || 'unknown';
-  
-  if (!rateLimit(ip, 20)) {
-    return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
+  // 2. Rate limiting
+  const ip = request.headers.get('x-forwarded-for') ?? 'unknown'
+  const allowed = await checkRateLimit(ip, 'ai-fiscal', RATE_LIMITS['ai-fiscal'].limit, RATE_LIMITS['ai-fiscal'].window)
+  if (!allowed) {
+    return NextResponse.json(
+      { error: 'Muitas requisições. Aguarde um momento.' },
+      { status: 429 }
+    )
   }
 
+  // 3. Autenticação
+  const { userId, profile, error } = await requireAuthWithProfile()
+  if (error) return error
+  if (!userId || !profile) {
+    return NextResponse.json({ error: 'Perfil não encontrado' }, { status: 404 })
+  }
+
+  // 4. Validação do body
   try {
-    const body = await request.json();
-    const result = fiscalSchema.safeParse(body);
-    
-    if (!result.success) {
-      return NextResponse.json({ error: 'Invalid request body', details: result.error.format() }, { status: 400 });
+    const body = await request.json()
+    const parsed = fiscalAiSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'Dados inválidos' }, { status: 400 })
     }
 
-    const { userId, question } = result.data;
+    const { question } = parsed.data
 
-    const supabase = await createClient();
+    // 5. Lógica protegida (Groq)
+    const metrics = await getFiscalMetrics(userId)
     
-    // 1. Busca perfil e contexto — Otimizado select
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('alfred_context, tax_regime, average_ticket, preferred_name, full_name')
-      .eq('id', userId)
-      .single();
+    // Log apenas metadados
+    console.log('Chamando Groq (ai-fiscal):', {
+      userId,
+      timestamp: new Date().toISOString()
+    })
 
-    // 2. Busca métricas fiscais atuais para dar contexto à IA
-    const metrics = await getFiscalMetrics(userId);
+    const systemPrompt = `Você é o Alfred, consultor fiscal.
+    Usuário: ${profile.preferred_name || 'Profissional'}.
+    Regime: ${profile.tax_regime || 'Não definido'}.
+    Métricas: Próxima obrigação ${metrics.nextObligation.name} em ${metrics.nextObligation.daysRemaining} dias.
+    Total pago no ano: R$ ${metrics.totalPaidYear.value}.
+    Instruções: Responda de forma prática e sem jargões.`
 
-    console.log('AI Fiscal Request:', { userId, question: question?.substring(0, 50) });
-
-    const alfredContext = profile?.alfred_context || '';
-    const taxRegime = profile?.tax_regime || 'Não definido';
-    const averageTicket = profile?.average_ticket || 0;
-
-    const systemPrompt = `Você é o Alfred, consultor fiscal do profissional ${profile?.preferred_name || 'Usuário'}.
-    Contexto do profissional: ${alfredContext}
-    Regime atual: ${taxRegime}
-    Faturamento mensal médio: R$ ${averageTicket}
-    
-    Dados fiscais atuais:
-    - Próxima obrigação: ${metrics.nextObligation.name} em ${metrics.nextObligation.daysRemaining} dias.
-    - Total pago no ano: R$ ${metrics.totalPaidYear.value}
-    - Projeção anual de impostos: R$ ${metrics.annualProjection.estimatedTotal}
-    
-    INSTRUÇÕES:
-    - Responda em linguagem simples, sem jargão técnico (contês).
-    - Seja direto e prático — o profissional precisa entender o que fazer, não estudar contabilidade.
-    - Se houver uma oportunidade de economia (ex: migrar de regime), mencione.
-    - Máximo 3 parágrafos.
-    - Use português do Brasil.`;
-
-    const groqApiKey = process.env.GROQ_API_KEY;
-    if (!groqApiKey) {
-      return NextResponse.json({ error: 'GROQ API key is missing' }, { status: 500 });
-    }
-
-    console.log('Fetching Groq AI completion for fiscal...');
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${groqApiKey}`,
+        'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         model: 'llama-3.3-70b-versatile',
         messages: [
           { role: 'system', content: systemPrompt },
-          { role: 'user', content: question || "Analise minha situação fiscal atual e me dê um feedback rápido." }
+          { role: 'user', content: question || "Dê um feedback rápido da minha situação." }
         ],
-        max_tokens: 512,
+        max_tokens: 800, // Limite para briefing/análise
+        temperature: 0.3
       })
-    });
+    })
 
     if (!response.ok) {
-      const errorData = await response.text();
-      console.error('Groq AI Error:', errorData);
-      return NextResponse.json({ error: 'Failed to fetch AI response' }, { status: 500 });
+      return NextResponse.json({ error: 'Erro na IA' }, { status: 500 })
     }
 
-    const data = await response.json();
-    return NextResponse.json({ answer: data.choices[0].message.content });
+    const data = await response.json()
+    const rawAnswer = data.choices?.[0]?.message?.content || ''
+    const cleanAnswer = sanitizeText(rawAnswer)
 
-  } catch (error: any) {
-    console.error('Unexpected error in fiscal AI route:', error);
-    return NextResponse.json({ error: error?.message || 'Internal Server Error' }, { status: 500 });
+    // 6. Auditoria
+    await logAudit({
+      userId,
+      action: 'fiscal_analysis_generated',
+      resource: 'fiscal',
+      ip,
+      userAgent: request.headers.get('user-agent') || 'unknown'
+    })
+
+    return NextResponse.json({ answer: cleanAnswer })
+
+  } catch (err) {
+    return NextResponse.json({ error: 'Erro interno' }, { status: 500 })
   }
 }
-
 
 export async function OPTIONS() {
   return new Response(null, { status: 204 })
