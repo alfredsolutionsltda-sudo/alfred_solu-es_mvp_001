@@ -92,6 +92,9 @@ export default function AlfredAssistant({ isOpen, onClose }: AlfredAssistantProp
         {messages.map((msg, i) => (
           <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div className={`flex gap-3 max-w-[85%] ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
+              <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 shadow-sm ${
+                msg.role === 'user' ? 'bg-neutral-900' : 'bg-white border border-neutral-100'
+              } overflow-hidden`}>
                 {msg.role === 'user' ? (
                   <User size={14} className="text-white" />
                 ) : (

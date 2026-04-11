@@ -393,6 +393,9 @@ Se terminar o bloco ${newBlock}, faça a transição naturalmente.`;
               className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'} animate-[fadeIn_0.5s_ease-out]`}
             >
               <div className={`flex items-end gap-2 md:gap-3 max-w-[90%] md:max-w-[85%] ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
+                <div className={`w-7 h-7 md:w-8 md:h-8 rounded-lg md:rounded-xl flex items-center justify-center shrink-0 shadow-sm ${
+                    msg.role === 'assistant' ? 'bg-[#1455CE]/10 text-[#1455CE]' : 'bg-neutral-100 text-neutral-400'
+                } overflow-hidden`}>
                     {msg.role === 'assistant' ? (
                       <img 
                         src="/images/alfred-avatar.png" 
@@ -402,6 +405,7 @@ Se terminar o bloco ${newBlock}, faça a transição naturalmente.`;
                     ) : (
                       <User size={14} className="md:size-4" />
                     )}
+                </div>
                 <div 
                     className={`px-4 md:px-6 py-3 md:py-4 rounded-[20px] md:rounded-[24px] font-bold text-sm leading-relaxed shadow-sm ${
                         msg.role === 'user' 
