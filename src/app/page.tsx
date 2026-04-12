@@ -4,12 +4,12 @@ import { redirect } from "next/navigation";
 export default async function Home({
   searchParams,
 }: {
-  searchParams: { [key: string]: string | string[] | undefined };
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
-  const code = searchParams.code as string | undefined;
+  const { code } = await searchParams;
 
   // Se houver um código de autenticação (ex: recuperação de senha), processa via callback
-  if (code) {
+  if (code && typeof code === 'string') {
     return redirect(`/auth/callback?code=${code}&next=/auth/reset-password`);
   }
 
