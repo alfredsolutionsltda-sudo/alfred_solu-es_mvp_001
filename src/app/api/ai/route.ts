@@ -1,5 +1,5 @@
 import { validateOrigin } from '@/lib/csrf'
-import { checkRateLimit, rateLimitResponse, LIMITS } from '@/lib/api/rate-limit'
+import { checkRateLimit } from '@/lib/api/rate-limit'
 import { sanitizeText } from '@/lib/sanitize'
 import { logger } from '@/lib/logger'
 import { NextResponse } from 'next/server';

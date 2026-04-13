@@ -3,7 +3,7 @@ import { headers } from 'next/headers'
 import { signContract, getContractBySlug } from '@/lib/data/contracts'
 import { sendContractSignedEmail } from '@/lib/email/resend'
 import { validateOrigin } from '@/lib/csrf'
-import { checkRateLimit, rateLimitResponse, LIMITS } from '@/lib/api/rate-limit'
+import { checkRateLimit } from '@/lib/api/rate-limit'
 import { logger } from '@/lib/logger'
 
 export async function POST(request: Request) {
@@ -26,6 +26,9 @@ export async function POST(request: Request) {
     const forwardedFor = headersList.get('x-forwarded-for')
     const realIp = headersList.get('x-real-ip')
     const ip = forwardedFor?.split(',')[0]?.trim() || realIp || '0.0.0.0'
+
+    const rl = await checkRateLimit(ip, 'contract-sign')
+    if (!rl.allowed) return rl.response!
 
     const signedAt = new Date().toISOString()
 

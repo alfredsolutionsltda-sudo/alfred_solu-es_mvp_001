@@ -1,10 +1,9 @@
 import { validateOrigin } from '@/lib/csrf'
-import { checkRateLimit, rateLimitResponse, LIMITS } from '@/lib/api/rate-limit'
+import { checkRateLimit } from '@/lib/api/rate-limit'
 import { sanitizeText } from '@/lib/sanitize'
 import { logger } from '@/lib/logger'
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { rateLimit } from '@/lib/rate-limit';
 
 import { z } from 'zod';
 
@@ -29,11 +28,11 @@ export async function POST(request: NextRequest) {
     return new Response(JSON.stringify({ error: 'Origem não permitida' }), { status: 403, headers: { 'Content-Type': 'application/json' } })
   }
 
-  const ip = request.headers.get('x-forwarded-for') || 'unknown';
-  
-  if (!rateLimit(ip, 20)) {
-    return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
-  }
+  const ip = request.headers.get('x-forwarded-for') 
+    ?? request.headers.get('x-real-ip') 
+    ?? 'unknown'
+  const rl = await checkRateLimit(ip, 'ai-chat') // Análise de cliente cai em ai-chat
+  if (!rl.allowed) return rl.response!
 
   try {
     const body = await request.json();

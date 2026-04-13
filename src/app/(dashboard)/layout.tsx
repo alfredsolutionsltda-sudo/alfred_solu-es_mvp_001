@@ -5,6 +5,8 @@ import BottomNav from '@/components/BottomNav'
 import ScoreUpdater from '@/components/clients/ScoreUpdater'
 import InactivityWrapper from '@/components/InactivityWrapper'
 
+import { PostHogProvider } from '@/components/PostHogProvider'
+
 export default async function DashboardLayout({
   children,
 }: {
@@ -37,7 +39,9 @@ export default async function DashboardLayout({
         userPlan={profile?.plan ?? null}
       />
       <main className="flex-1 pt-20 pb-20 md:pb-0">
-        {children}
+        <PostHogProvider>
+          {children}
+        </PostHogProvider>
       </main>
       <BottomNav />
     </div>

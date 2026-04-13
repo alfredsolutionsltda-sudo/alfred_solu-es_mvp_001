@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import { cacheGet, cacheSet } from '@/lib/cache/redis';
 import { 
   ReportPeriod, 
   ReportMetrics, 
@@ -38,6 +39,12 @@ export async function getPeriodDates(period: ReportPeriod) {
 }
 
 export async function getReportMetrics(userId: string, period: ReportPeriod): Promise<ReportMetrics> {
+  const cacheKey = `alfred:${userId}:report-metrics:${period}`
+  
+  // Tenta buscar do cache primeiro
+  const cached = await cacheGet<ReportMetrics>(cacheKey)
+  if (cached) return cached
+
   const supabase = await createClient();
   const { start, end, priorStart, priorEnd } = await getPeriodDates(period);
 
@@ -94,7 +101,7 @@ export async function getReportMetrics(userId: string, period: ReportPeriod): Pr
   const safeNum = (n: any) => (isNaN(n) || !isFinite(n)) ? 0 : n;
   const calcVar = (c: number, p: number) => p > 0 ? ((c - p) / p) * 100 : (c > 0 ? 100 : 0);
 
-  return {
+  const metrics: ReportMetrics = {
     grossRevenue: safeNum(curr.gross),
     received: safeNum(curr.received),
     delinquency: safeNum(curr.delinquency),
@@ -108,6 +115,11 @@ export async function getReportMetrics(userId: string, period: ReportPeriod): Pr
       netMargin: safeNum(currMargin - privMargin)
     }
   };
+
+  // Salva no cache por 60 segundos
+  await cacheSet(cacheKey, metrics, 60);
+
+  return metrics;
 }
 
 export async function getRevenueByMonth(userId: string, year: number): Promise<RevenueByMonth[]> {

@@ -12,11 +12,11 @@ export async function GET(request: NextRequest) {
   }
 
   // 2. Rate limiting
-  const ip = request.headers.get('x-forwarded-for') ?? 'unknown'
-  const allowed = await checkRateLimit(ip, 'clients-update-scores', 10, 3600)
-  if (!allowed) {
-    return NextResponse.json({ error: 'Muitas requisições.' }, { status: 429 })
-  }
+  const ip = request.headers.get('x-forwarded-for') 
+    ?? request.headers.get('x-real-ip') 
+    ?? 'unknown'
+  const rl = await checkRateLimit(ip, 'clients-update-scores')
+  if (!rl.allowed) return rl.response!
 
   // 3. Autenticação
   const { userId, error } = await requireAuth()

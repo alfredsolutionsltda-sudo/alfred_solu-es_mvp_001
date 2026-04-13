@@ -1,3 +1,11 @@
+import { PostHog } from 'posthog-node'
+import { createBugReport } from '@/lib/linear/client'
+
+const serverPostHog = new PostHog(
+  process.env.NEXT_PUBLIC_POSTHOG_KEY!,
+  { host: process.env.NEXT_PUBLIC_POSTHOG_HOST }
+)
+
 type LogLevel = 'info' | 'warn' | 'error'
 
 interface LogEntry {
@@ -12,7 +20,8 @@ export function log(
   level: LogLevel,
   message: string,
   context?: string,
-  data?: Record<string, unknown>
+  data?: Record<string, unknown>,
+  userId?: string
 ) {
   const entry: LogEntry = {
     level,
@@ -20,6 +29,27 @@ export function log(
     context,
     data: data ? sanitizeLogData(data) : undefined,
     timestamp: new Date().toISOString(),
+  }
+
+  // Envia para PostHog server-side se for erro
+  if (level === 'error') {
+    serverPostHog.capture({
+      distinctId: userId || 'anonymous_server_error',
+      event: '$exception',
+      properties: {
+        $exception_message: message,
+        context,
+        ...data
+      },
+    })
+  }
+
+  // Em produção: cria issue no Linear automaticamente para erros
+  if (process.env.NODE_ENV === 'production' && level === 'error') {
+    const err = new Error(message)
+    createBugReport(err, context ?? 'Unknown', userId).catch(e =>
+      console.error('[Logger] Falha ao criar issue no Linear:', e)
+    )
   }
 
   if (process.env.NODE_ENV === 'production') {
@@ -33,7 +63,8 @@ export function log(
     `[${entry.timestamp}] [${level.toUpperCase()}]`,
     context ? `[${context}]` : '',
     message,
-    data || ''
+    data || '',
+    userId ? `[User: ${userId}]` : ''
   )
 }
 
@@ -55,10 +86,10 @@ function sanitizeLogData(
 }
 
 export const logger = {
-  info: (msg: string, ctx?: string, data?: Record<string, unknown>) => 
-    log('info', msg, ctx, data),
-  warn: (msg: string, ctx?: string, data?: Record<string, unknown>) => 
-    log('warn', msg, ctx, data),
-  error: (msg: string, ctx?: string, data?: Record<string, unknown>) => 
-    log('error', msg, ctx, data),
+  info: (msg: string, ctx?: string, data?: Record<string, unknown>, userId?: string) => 
+    log('info', msg, ctx, data, userId),
+  warn: (msg: string, ctx?: string, data?: Record<string, unknown>, userId?: string) => 
+    log('warn', msg, ctx, data, userId),
+  error: (msg: string, ctx?: string, data?: Record<string, unknown>, userId?: string) => 
+    log('error', msg, ctx, data, userId),
 }

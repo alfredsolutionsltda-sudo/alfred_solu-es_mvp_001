@@ -1,5 +1,6 @@
 import { createClient as createSupabaseServerClient } from '@/lib/supabase/server';
 import { ClientFormData, ClientWithMetrics } from '@/types/clients';
+import { cacheGet, cacheSet, cacheDelete } from '@/lib/cache/redis';
 
 export async function getClients(userId: string, filters?: { status?: string, search?: string, limit?: number, offset?: number }): Promise<{ data: ClientWithMetrics[], count: number }> {
   const supabase = await createSupabaseServerClient();
@@ -134,11 +135,15 @@ export async function getClientById(userId: string, clientId: string) {
 }
 
 export async function getClientMetrics(userId: string) {
+  const cacheKey = `alfred:${userId}:client-metrics`
+  
+  // Tenta buscar do cache primeiro
+  const cached = await cacheGet<any>(cacheKey)
+  if (cached) return cached
+
   const supabase = await createSupabaseServerClient();
   
   // Otimização: Busca apenas os counts agregados por status
-  // Infelizmente o PostgREST não suporta grouping direto de forma simples sem RPC
-  // Mas podemos fazer queries head-only para cada status principal em paralelo para ser rápido e leve
   const [
     { count: total },
     { count: ativos },
@@ -166,15 +171,20 @@ export async function getClientMetrics(userId: string) {
 
   const avgBilling = (total || 0) > 0 ? (totalBilled / (total || 1)) : 0;
 
-  return {
+  const metrics = {
     total: total || 0,
     ativos: ativos || 0,
     inativos: inativos || 0,
     inadimplentes: inadimplentes || 0,
     avg_billing: avgBilling,
     inadimplency_total: inadimplencyTotal,
-    retention_rate: 0 // Simplificado por enquanto, requer query complexa
+    retention_rate: 0
   };
+
+  // Salva no cache por 30 segundos
+  await cacheSet(cacheKey, metrics, 30);
+
+  return metrics;
 }
 
 export async function createClient(userId: string, data: ClientFormData) {
@@ -193,6 +203,10 @@ export async function createClient(userId: string, data: ClientFormData) {
     .single();
 
   if (error) throw error;
+
+  // Invalida o cache ao criar novo cliente
+  await cacheDelete(`alfred:${userId}:client-metrics`);
+
   return newClient;
 }
 

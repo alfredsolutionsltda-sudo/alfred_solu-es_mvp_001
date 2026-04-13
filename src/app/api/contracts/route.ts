@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createContract } from '@/lib/data/contracts'
 import { validateOrigin } from '@/lib/csrf'
-import { checkRateLimit, rateLimitResponse, LIMITS } from '@/lib/api/rate-limit'
+import { checkRateLimit } from '@/lib/api/rate-limit'
 import { logger } from '@/lib/logger'
 
 export async function POST(request: Request) {

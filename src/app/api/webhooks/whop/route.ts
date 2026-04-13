@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
 
+import { checkRateLimit } from '@/lib/api/rate-limit'
+
 const adminClient = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -30,6 +32,11 @@ function getPlanFromWhopId(whopPlanId: string): 'builder' | 'founder' | null {
 }
 
 export async function POST(request: NextRequest) {
+  const ip = request.headers.get('x-forwarded-for') 
+    ?? request.headers.get('x-real-ip') 
+    ?? 'unknown'
+  const rl = await checkRateLimit(ip, 'webhook')
+  if (!rl.allowed) return rl.response!
   try {
     const payload = await request.text()
     const signature = request.headers.get('whop-signature') || ''

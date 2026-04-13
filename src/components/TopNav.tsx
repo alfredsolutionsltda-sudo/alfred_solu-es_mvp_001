@@ -21,9 +21,12 @@ import {
   Info,
   Calendar,
   Clock,
-  ChevronRight
+  ChevronRight,
+  MessageSquare,
+  Map
 } from 'lucide-react'
 import { getContractAlertsAction } from '@/app/actions/contractActions'
+import FeedbackModal from './FeedbackModal'
 
 const navLinks = [
   { href: '/dashboard', label: 'Início', icon: LayoutDashboard },
@@ -32,6 +35,7 @@ const navLinks = [
   { href: '/propostas', label: 'Propostas', icon: FileSignature },
   { href: '/fiscal', label: 'Fiscal', icon: Receipt },
   { href: '/relatorios', label: 'Relatórios', icon: BarChart2 },
+  { href: '/roadmap', label: 'Roadmap', icon: Map },
 ]
 
 interface TopNavProps {
@@ -47,6 +51,7 @@ export default function TopNav({ userEmail, userName, userPlan }: TopNavProps) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false)
+  const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false)
   const [alerts, setAlerts] = useState<any[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -229,6 +234,16 @@ export default function TopNav({ userEmail, userName, userPlan }: TopNavProps) {
               </div>
             )}
           </div>
+          
+          {/* Botão de Feedback */}
+          <button
+            onClick={() => setIsFeedbackModalOpen(true)}
+            className="p-2 md:p-2.5 hover:bg-[#1455CE]/5 text-neutral-400 hover:text-[#1455CE] rounded-[14px] transition-all border border-transparent hover:border-[#1455CE]/10 flex items-center gap-2 group"
+            title="Enviar Feedback"
+          >
+            <MessageSquare size={20} className="group-hover:scale-110 transition-transform" />
+            <span className="hidden lg:inline text-[10px] font-black uppercase tracking-widest">Feedback</span>
+          </button>
 
           {/* Avatar + Dropdown */}
           <div className="flex items-center gap-4 pl-4 md:pl-6 border-l border-neutral-100 relative" ref={dropdownRef}>
@@ -393,6 +408,12 @@ export default function TopNav({ userEmail, userName, userPlan }: TopNavProps) {
           </div>
         </div>
       )}
+
+      {/* Modal de Feedback */}
+      <FeedbackModal 
+        isOpen={isFeedbackModalOpen} 
+        onClose={() => setIsFeedbackModalOpen(false)} 
+      />
     </>
   )
 }

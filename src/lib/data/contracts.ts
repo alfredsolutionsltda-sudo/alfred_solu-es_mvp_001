@@ -9,6 +9,7 @@ import type {
   ContractFilters,
   SignatureData,
 } from '@/types/contracts'
+import { cacheGet, cacheSet, cacheDelete } from '@/lib/cache/redis'
 
 // Cliente com service role para operações SECURITY DEFINER
 function getServiceClient() {
@@ -100,6 +101,12 @@ export async function getContractBySlug(
 export async function getContractMetrics(
   userId: string
 ): Promise<ContractMetrics> {
+  const cacheKey = `alfred:${userId}:contract-metrics`
+  
+  // Tenta buscar do cache primeiro
+  const cached = await cacheGet<ContractMetrics>(cacheKey)
+  if (cached) return cached
+
   const supabase = await createClient()
 
   const [
@@ -150,7 +157,7 @@ export async function getContractMetrics(
 
   const taxaConversao = totalPropostas ? Math.round(((totalAtivos || 0) / totalPropostas) * 100) : 0
 
-  return {
+  const metrics: ContractMetrics = {
     totalAtivos: totalAtivos || 0,
     pendentesAssinatura: pendentesAssinatura || 0,
     vencendoEm30Dias: vencendoEm30Dias || 0,
@@ -158,6 +165,11 @@ export async function getContractMetrics(
     taxaConversao,
     totalPropostas: totalPropostas || 0
   }
+
+  // Salva no cache por 60 segundos
+  await cacheSet(cacheKey, metrics, 60)
+
+  return metrics
 }
 
 // ─────────────────────────────────────────
@@ -233,6 +245,9 @@ export async function createContract(
     console.error('Erro ao criar contrato:', error)
     return null
   }
+
+  // Invalida o cache ao criar novo contrato
+  await cacheDelete(`alfred:${userId}:contract-metrics`);
 
   return contract as unknown as ContractWithClient
 }

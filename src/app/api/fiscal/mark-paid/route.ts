@@ -18,11 +18,11 @@ export async function POST(request: NextRequest) {
   }
 
   // 2. Rate limiting
-  const ip = request.headers.get('x-forwarded-for') ?? 'unknown'
-  const allowed = await checkRateLimit(ip, 'fiscal-mark-paid', 20, 60)
-  if (!allowed) {
-    return NextResponse.json({ error: 'Muitas requisições.' }, { status: 429 })
-  }
+  const ip = request.headers.get('x-forwarded-for') 
+    ?? request.headers.get('x-real-ip') 
+    ?? 'unknown'
+  const rl = await checkRateLimit(ip, 'fiscal-mark-paid')
+  if (!rl.allowed) return rl.response!
 
   // 3. Autenticação
   const { userId, error } = await requireAuth()

@@ -1,6 +1,6 @@
 import { requireAuthWithProfile } from '@/lib/api/auth'
 import { validateOrigin } from '@/lib/csrf'
-import { checkRateLimit, RATE_LIMITS } from '@/lib/api/rate-limit'
+import { checkRateLimit } from '@/lib/api/rate-limit'
 import { sanitizeText } from '@/lib/sanitize'
 import { logAudit } from '@/lib/audit'
 import { NextRequest, NextResponse } from 'next/server'
@@ -21,14 +21,11 @@ export async function POST(request: NextRequest) {
   }
 
   // 2. Rate limiting
-  const ip = request.headers.get('x-forwarded-for') ?? 'unknown'
-  const allowed = await checkRateLimit(ip, 'ai-chat', RATE_LIMITS['ai-chat'].limit, RATE_LIMITS['ai-chat'].window)
-  if (!allowed) {
-    return NextResponse.json(
-      { error: 'Muitas requisições. Aguarde um momento.' },
-      { status: 429 }
-    )
-  }
+  const ip = request.headers.get('x-forwarded-for') 
+    ?? request.headers.get('x-real-ip') 
+    ?? 'unknown'
+  const rl = await checkRateLimit(ip, 'ai-chat')
+  if (!rl.allowed) return rl.response!
 
   // 3. Autenticação
   const { userId, profile, error } = await requireAuthWithProfile()

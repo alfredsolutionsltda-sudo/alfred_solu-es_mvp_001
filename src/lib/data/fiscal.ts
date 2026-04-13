@@ -1,9 +1,16 @@
 import { createClient } from '@/lib/supabase/server';
 import { TaxRegime, FiscalMetrics, MonthlyProjection } from '@/types/fiscal';
+import { cacheGet, cacheSet, cacheDelete } from '@/lib/cache/redis';
 import { ObrigacaoFiscal, Profile } from '@/types/database';
 import { calculateMEI, calculateSimplesNacional, calculateLucroPresumido, calculateCarneLeao } from '../fiscal/tax-calculator';
 
 export async function getObrigacoes(userId: string, year: number): Promise<ObrigacaoFiscal[]> {
+  const cacheKey = `alfred:${userId}:obrigacoes-fiscal-${year}`
+  
+  // Tenta buscar do cache primeiro
+  const cached = await cacheGet<ObrigacaoFiscal[]>(cacheKey)
+  if (cached) return cached
+
   const supabase = await createClient();
 
   // 1. Busca obrigações existentes
@@ -41,11 +48,15 @@ export async function getObrigacoes(userId: string, year: number): Promise<Obrig
         .eq('year', year)
         .order('due_date', { ascending: true });
         
-      return freshData || [];
+      const result = freshData || [];
+      await cacheSet(cacheKey, result, 3600); // 1 hora
+      return result;
     }
   }
 
-  return data || [];
+  const result = data || [];
+  await cacheSet(cacheKey, result, 3600); // 1 hora
+  return result;
 }
 
 export async function generateObrigacoesForYear(userId: string, regime: TaxRegime, year: number, averageMonthlyRevenue: number) {
@@ -100,6 +111,12 @@ export async function generateObrigacoesForYear(userId: string, regime: TaxRegim
 }
 
 export async function getFiscalMetrics(userId: string): Promise<FiscalMetrics> {
+  const cacheKey = `alfred:${userId}:fiscal-metrics`
+  
+  // Tenta buscar do cache primeiro
+  const cached = await cacheGet<FiscalMetrics>(cacheKey)
+  if (cached) return cached
+
   const supabase = await createClient();
   const now = new Date();
   const currentYear = now.getFullYear();
@@ -154,7 +171,7 @@ export async function getFiscalMetrics(userId: string): Promise<FiscalMetrics> {
   const totalRevenue = faturamento?.reduce((acc, curr) => acc + (curr.amount || 0), 0) || 0;
   const meiLimitPercent = (totalRevenue / 81000) * 100;
 
-  return {
+  const metrics: FiscalMetrics = {
     currentMonthTax: {
       value: currentMonthTax?.amount || 0,
       status: (currentMonthTax?.status as any) || 'pendente',
@@ -176,6 +193,10 @@ export async function getFiscalMetrics(userId: string): Promise<FiscalMetrics> {
     },
     meiLimitPercent: profile?.tax_regime === 'MEI' ? meiLimitPercent : undefined
   };
+
+  await cacheSet(cacheKey, metrics, 60);
+
+  return metrics;
 }
 
 export async function getAnualProjection(userId: string, year: number): Promise<MonthlyProjection[]> {
@@ -221,5 +242,12 @@ export async function markObrigacaoAsPaid(userId: string, obrigacaoId: string, p
     .single();
 
   if (error) throw error;
+
+  // Invalida o cache ao marcar como paga
+  await cacheDelete(
+    `alfred:${userId}:fiscal-metrics`,
+    `alfred:${userId}:obrigacoes-fiscal-${data.year}`
+  );
+
   return data;
 }

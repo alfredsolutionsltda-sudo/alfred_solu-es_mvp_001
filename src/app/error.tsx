@@ -1,5 +1,6 @@
 'use client'
 import { useEffect } from 'react'
+import { posthog } from '@/lib/posthog/client'
 
 export default function Error({
   error,
@@ -9,6 +10,14 @@ export default function Error({
   reset: () => void
 }) {
   useEffect(() => {
+    // Reporta o erro ao PostHog
+    posthog.capture('$exception', {
+      $exception_message: error.message,
+      $exception_type: error.name,
+      $exception_stack_trace_raw: error.stack,
+      digest: error.digest,
+    })
+
     if (process.env.NODE_ENV === 'production') {
       console.error('App error:', error.digest)
     }

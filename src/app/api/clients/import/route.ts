@@ -13,14 +13,11 @@ export async function POST(request: NextRequest) {
   }
 
   // 2. Rate limiting (Estrito: 3 por hora para importação)
-  const ip = request.headers.get('x-forwarded-for') ?? 'unknown'
-  const allowed = await checkRateLimit(ip, 'client-import', 3, 3600)
-  if (!allowed) {
-    return NextResponse.json(
-      { error: 'Muitas importações. Limite de 3 por hora.' },
-      { status: 429 }
-    )
-  }
+  const ip = request.headers.get('x-forwarded-for') 
+    ?? request.headers.get('x-real-ip') 
+    ?? 'unknown'
+  const rl = await checkRateLimit(ip, 'client-import')
+  if (!rl.allowed) return rl.response!
 
   // 3. Autenticação
   const { userId, error } = await requireAuth()

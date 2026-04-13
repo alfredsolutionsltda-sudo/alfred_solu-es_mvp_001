@@ -1,6 +1,6 @@
 import { requireAuth } from '@/lib/api/auth'
 import { validateOrigin } from '@/lib/csrf'
-import { checkRateLimit, RATE_LIMITS } from '@/lib/api/rate-limit'
+import { checkRateLimit } from '@/lib/api/rate-limit'
 import { logAudit } from '@/lib/audit'
 import { fiscalCalculateSchema } from '@/lib/api/schemas'
 import { compareRegimes } from '@/lib/fiscal/tax-calculator'
@@ -13,11 +13,11 @@ export async function POST(request: NextRequest) {
   }
 
   // 2. Rate limiting
-  const ip = request.headers.get('x-forwarded-for') ?? 'unknown'
-  const allowed = await checkRateLimit(ip, 'fiscal-calculate', RATE_LIMITS['fiscal-calculate'].limit, RATE_LIMITS['fiscal-calculate'].window)
-  if (!allowed) {
-    return NextResponse.json({ error: 'Muitas requisições.' }, { status: 429 })
-  }
+  const ip = request.headers.get('x-forwarded-for') 
+    ?? request.headers.get('x-real-ip') 
+    ?? 'unknown'
+  const rl = await checkRateLimit(ip, 'fiscal-calculate')
+  if (!rl.allowed) return rl.response!
 
   // 3. Autenticação (Opcional se for público, mas o usuário pediu para proteger TODAS as API Routes)
   const { userId, error } = await requireAuth()
